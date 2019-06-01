@@ -64,8 +64,11 @@ import java.util.List;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.dp;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrColor;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.runOnUiThread;
 
 public class ThemeSettingsController extends Controller implements View.OnClickListener {
+    private static final long APP_RESTART_DELAY = 100L;
+
     private Board dummyBoard;
 
     {
@@ -210,7 +213,10 @@ public class ThemeSettingsController extends Controller implements View.OnClickL
         Theme selectedTheme = themeHelper.getThemes().get(currentItem);
         ThemeHelper.PrimaryColor selectedColor = selectedPrimaryColors.get(currentItem);
         themeHelper.changeTheme(selectedTheme, selectedColor, selectedAccentColor);
-        ((StartActivity) context).restartApp();
+
+        // This is a hack to fix this strange issue https://github.com/Adamantcheese/Kuroba/issues/3
+        // I have no idea what's causing it (Maybe reordering? But there is no multithreaded code)
+        runOnUiThread(() -> ((StartActivity) context).restartApp(), APP_RESTART_DELAY);
     }
 
     private void showAccentColorPicker() {
