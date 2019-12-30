@@ -318,7 +318,7 @@ public class Chan4
         @Override
         public void archives(ArchiveRequestListener archivesListener) {
             requestQueue.add(new JsonReaderRequest<List<ArchivesManager.Archives>>(
-                    "https://mayhemydg.github.io/archives.json/archives.json",
+                    "https://nstepien.github.io/archives.json/archives.json",
                     archivesListener::onArchivesReceived,
                     error -> {
                         Logger.e(TAG, "Failed to get archives for 4Chan");
