@@ -16,6 +16,8 @@
  */
 package com.github.adamantcheese.chan.core.manager;
 
+import androidx.annotation.NonNull;
+
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.SiteActions;
@@ -23,6 +25,8 @@ import com.github.adamantcheese.chan.ui.layout.ArchivesLayout;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import static com.github.adamantcheese.chan.utils.AndroidUtils.showToast;
 
 public class ArchivesManager
         implements SiteActions.ArchiveRequestListener {
@@ -49,6 +53,12 @@ public class ArchivesManager
     @Override
     public void onArchivesReceived(List<Archives> archives) {
         archivesList = archives;
+    }
+
+    @Override
+    public void onCouldNotReceiveArchives(@NonNull String message) {
+        showToast("Couldn't receive archives: reason = " + message);
+        archivesList = new ArrayList<>();
     }
 
     public static class Archives {

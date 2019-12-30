@@ -322,7 +322,12 @@ public class Chan4
                     archivesListener::onArchivesReceived,
                     error -> {
                         Logger.e(TAG, "Failed to get archives for 4Chan");
-                        archivesListener.onArchivesReceived(new ArrayList<>());
+
+                        String message = error.getMessage() != null
+                                ? error.getMessage()
+                                : error.getClass().getName();
+
+                        archivesListener.onCouldNotReceiveArchives(message);
                     }
             ) {
                 @Override

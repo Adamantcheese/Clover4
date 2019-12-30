@@ -16,6 +16,8 @@
  */
 package com.github.adamantcheese.chan.core.site;
 
+import androidx.annotation.NonNull;
+
 import com.github.adamantcheese.chan.core.manager.ArchivesManager;
 import com.github.adamantcheese.chan.core.model.Archive;
 import com.github.adamantcheese.chan.core.model.orm.Board;
@@ -47,6 +49,7 @@ public interface SiteActions {
 
     interface ArchiveRequestListener {
         void onArchivesReceived(List<ArchivesManager.Archives> archives);
+        void onCouldNotReceiveArchives(@NonNull String message);
     }
 
     void post(Reply reply, PostListener postListener);
