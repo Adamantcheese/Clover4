@@ -16,6 +16,8 @@
  */
 package com.github.adamantcheese.chan.core.site;
 
+import androidx.annotation.NonNull;
+
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 
 import okhttp3.HttpUrl;
@@ -26,6 +28,8 @@ public abstract class SiteUrlHandler {
     abstract public boolean matchesName(String value);
 
     abstract public boolean respondsTo(HttpUrl url);
+
+    abstract public boolean matchesMediaHost(@NonNull HttpUrl url);
 
     public String desktopUrlForThread(Loadable loadable) {
         // -1 here means that we only want to get a link for a thread

@@ -1,9 +1,12 @@
 package com.github.adamantcheese.chan.core.site.sites.dvach;
 
+import androidx.annotation.NonNull;
+
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.settings.OptionsSetting;
+import com.github.adamantcheese.chan.core.site.ChunkDownloaderSiteProperties;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.SiteAuthentication;
 import com.github.adamantcheese.chan.core.site.SiteIcon;
@@ -34,7 +37,10 @@ public class Dvach
         extends CommonSite {
     private static final String TAG = "Dvach";
 
+    private final ChunkDownloaderSiteProperties chunkDownloaderSiteProperties;
     public static final CommonSiteUrlHandler URL_HANDLER = new CommonSiteUrlHandler() {
+        private static final String ROOT = "https://2ch.hk";
+
         @Override
         public Class<? extends Site> getSiteClass() {
             return Dvach.class;
@@ -42,7 +48,12 @@ public class Dvach
 
         @Override
         public HttpUrl getUrl() {
-            return HttpUrl.parse("https://2ch.hk");
+            return HttpUrl.parse(ROOT);
+        }
+
+        @Override
+        public String[] getMediaHosts() {
+            return new String[]{ROOT};
         }
 
         @Override
@@ -65,15 +76,20 @@ public class Dvach
             }
         }
     };
-
     static final String CAPTCHA_KEY = "6LeQYz4UAAAAAL8JCk35wHSv6cuEV5PyLhI6IxsM";
-
     private OptionsSetting<Chan4.CaptchaType> captchaType;
+
+    public Dvach() {
+        chunkDownloaderSiteProperties = new ChunkDownloaderSiteProperties(
+                // 2ch.hk sends file size in KB
+                false, true);
+    }
 
     @Override
     public void initializeSettings() {
         super.initializeSettings();
-        captchaType = new OptionsSetting<>(settingsProvider, "preference_captcha_type", Chan4.CaptchaType.class, V2JS);
+        captchaType =
+                new OptionsSetting<>(settingsProvider, "preference_captcha_type_dvach", Chan4.CaptchaType.class, V2JS);
     }
 
     @Override
@@ -224,5 +240,11 @@ public class Dvach
         setApi(new DvachApi(this));
 
         setParser(new DvachCommentParser());
+    }
+
+    @NonNull
+    @Override
+    public ChunkDownloaderSiteProperties getChunkDownloaderSiteProperties() {
+        return chunkDownloaderSiteProperties;
     }
 }
