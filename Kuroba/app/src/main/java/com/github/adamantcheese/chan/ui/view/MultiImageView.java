@@ -279,8 +279,10 @@ public class MultiImageView
     }
 
     private void setThumbnail(Loadable loadable, PostImage postImage, boolean center) {
+        BackgroundUtils.ensureMainThread();
+
         if (getWidth() == 0 || getHeight() == 0) {
-            Logger.e(TAG, "getWidth() or getHeight() returned 0, not loading");
+            Logger.e(TAG, "setThumbnail() getWidth() or getHeight() returned 0, not loading");
             return;
         }
 
@@ -325,7 +327,7 @@ public class MultiImageView
         BackgroundUtils.ensureMainThread();
 
         if (getWidth() == 0 || getHeight() == 0) {
-            Logger.e(TAG, "getWidth() or getHeight() returned 0, not loading big image");
+            Logger.e(TAG, "setBigImage() getWidth() or getHeight() returned 0, not loading big image");
             return;
         }
 
@@ -390,7 +392,7 @@ public class MultiImageView
         BackgroundUtils.ensureMainThread();
 
         if (getWidth() == 0 || getHeight() == 0) {
-            Logger.e(TAG, "getWidth() or getHeight() returned 0, not loading");
+            Logger.e(TAG, "setGif() getWidth() or getHeight() returned 0, not loading");
             return;
         }
 
@@ -486,6 +488,12 @@ public class MultiImageView
 
     private void setVideo(Loadable loadable, PostImage postImage) {
         BackgroundUtils.ensureMainThread();
+
+        if (getWidth() == 0 || getHeight() == 0) {
+            Logger.e(TAG, "setVideo() getWidth() or getHeight() returned 0, not loading");
+            return;
+        }
+
         if (ChanSettings.videoStream.get()) {
             openVideoInternalStream(postImage.imageUrl.toString());
         } else {
@@ -636,6 +644,13 @@ public class MultiImageView
     }
 
     private void setOther(Loadable loadable, PostImage image) {
+        BackgroundUtils.ensureMainThread();
+
+        if (getWidth() == 0 || getHeight() == 0) {
+            Logger.e(TAG, "setOther() getWidth() or getHeight() returned 0, not loading");
+            return;
+        }
+
         if (image.type == PostImage.Type.PDF) {
             cancellableToast.showToast(R.string.pdf_not_viewable);
         }
