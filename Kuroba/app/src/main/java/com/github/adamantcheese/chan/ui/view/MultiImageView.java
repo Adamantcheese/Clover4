@@ -473,6 +473,7 @@ public class MultiImageView
         GifImageView view = new GifImageView(getContext());
         view.setImageDrawable(drawable);
 
+        view.setOnClickListener(null);
         view.setOnTouchListener((view1, motionEvent) -> gestureDetector.onTouchEvent(motionEvent));
         onModeLoaded(Mode.GIFIMAGE, view);
     }
