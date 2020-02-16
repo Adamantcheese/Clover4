@@ -16,14 +16,12 @@
  */
 package com.github.adamantcheese.chan.ui.controller;
 
-import android.app.Activity;
 import android.content.Context;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.Point;
 import android.util.Pair;
 import android.view.View;
-import android.view.Window;
 import android.widget.CompoundButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -52,6 +50,7 @@ import static com.github.adamantcheese.chan.utils.AndroidUtils.getDisplaySize;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getWindow;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.inflate;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.showToast;
 import static com.github.adamantcheese.chan.utils.AnimationUtils.animateStatusBar;
 
 public class ImageOptionsController
@@ -211,7 +210,14 @@ public class ImageOptionsController
         if (v == cancel) {
             imageReencodingHelper.pop();
         } else if (v == ok) {
-            presenter.applyImageOptions();
+            if (!presenter.applyImageOptions()) {
+                // For now we only return false when reply.file == null
+                showToast(
+                        context,
+                        getString(R.string.could_not_apply_image_options,
+                                context.getString(R.string.reply_file_is_null))
+                );
+            }
         } else if (v == viewHolder) {
             imageReencodingHelper.pop();
         }

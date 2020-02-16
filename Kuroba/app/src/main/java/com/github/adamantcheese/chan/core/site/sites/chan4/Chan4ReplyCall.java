@@ -82,6 +82,10 @@ public class Chan4ReplyCall
     ) {
         RequestBody requestBody;
 
+        if (reply.file == null) {
+            throw new NullPointerException("reply.file is null!");
+        }
+
         if (progressListener == null) {
             requestBody = RequestBody.create(MediaType.parse("application/octet-stream"), reply.file);
         } else {

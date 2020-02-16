@@ -794,4 +794,6 @@ Don't have a 4chan Pass?<br>
     <string name="settings_report_description">Report a problem/crash</string>
     <string name="settings_auto_crash_report">Automatic crash reporting</string>
     <string name="settings_auto_crash_report_description">By enabling this setting, all collected crash logs will be uploaded automatically on every app restart. Crash reports only collect the crash log itself, app version and basic OS information.</string>
+    <string name="no_file_is_selected">No file is selected</string>
+    <string name="reply_file_is_null">reply.file is null</string>
 </resources>

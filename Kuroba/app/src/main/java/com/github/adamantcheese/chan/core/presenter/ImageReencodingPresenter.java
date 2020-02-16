@@ -88,6 +88,11 @@ public class ImageReencodingPresenter {
 
     public void loadImagePreview() {
         Reply reply = replyManager.getReply(loadable);
+        if (reply.file == null) {
+            showToast(context, R.string.no_file_is_selected);
+            return;
+        }
+
         Point displaySize = getDisplaySize();
         ImageDecoder.decodeFileOnBackgroundThread(reply.file,
                 //decode to the device width/height, whatever is smaller
@@ -110,6 +115,10 @@ public class ImageReencodingPresenter {
     public Bitmap.CompressFormat getImageFormat() {
         try {
             Reply reply = replyManager.getReply(loadable);
+            if (reply.file == null) {
+                return null;
+            }
+
             return BitmapUtils.getImageFormat(reply.file);
         } catch (Exception e) {
             Logger.e(TAG, "Error while trying to get image format", e);
@@ -121,6 +130,10 @@ public class ImageReencodingPresenter {
     public Pair<Integer, Integer> getImageDims() {
         try {
             Reply reply = replyManager.getReply(loadable);
+            if (reply.file == null) {
+                return null;
+            }
+
             return BitmapUtils.getImageDims(reply.file);
         } catch (Exception e) {
             Logger.e(TAG, "Error while trying to get image dimensions", e);
@@ -152,12 +165,12 @@ public class ImageReencodingPresenter {
         imageOptions.setChangeImageChecksum(isChecked);
     }
 
-    public void applyImageOptions() {
+    public boolean applyImageOptions() {
         Reply reply;
 
         synchronized (this) {
             if (cancelable != null) {
-                return;
+                return true;
             }
 
             reply = replyManager.getReply(loadable);
@@ -170,7 +183,7 @@ public class ImageReencodingPresenter {
         if (!imageOptions.getRemoveFilename() && !imageOptions.getFixExif() && !imageOptions.getRemoveMetadata()
                 && !imageOptions.getChangeImageChecksum() && imageOptions.getReencodeSettings() == null) {
             callback.onImageOptionsApplied(reply, false);
-            return;
+            return true;
         }
 
         //only the "remove filename" option is selected
@@ -178,7 +191,12 @@ public class ImageReencodingPresenter {
                 && !imageOptions.getChangeImageChecksum() && imageOptions.getReencodeSettings() == null) {
             reply.fileName = getNewImageName(reply.fileName, AS_IS);
             callback.onImageOptionsApplied(reply, true);
-            return;
+            return true;
+        }
+
+        if (reply.file == null) {
+            // File is not valid
+            return false;
         }
 
         //one of the options that affects the image is selected (reencode/remove metadata/change checksum)
@@ -218,6 +236,8 @@ public class ImageReencodingPresenter {
         synchronized (this) {
             cancelable = localCancelable;
         }
+
+        return true;
     }
 
     private String getNewImageName(String currentFileName, ReencodeType newType) {

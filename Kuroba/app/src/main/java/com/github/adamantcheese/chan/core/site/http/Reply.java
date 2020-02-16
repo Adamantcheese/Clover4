@@ -16,6 +16,8 @@
  */
 package com.github.adamantcheese.chan.core.site.http;
 
+import androidx.annotation.Nullable;
+
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 
 import java.io.File;
@@ -36,6 +38,7 @@ public class Reply {
 
     public Loadable loadable;
 
+    @Nullable
     public File file;
     public String fileName = "";
     public String name = "";
