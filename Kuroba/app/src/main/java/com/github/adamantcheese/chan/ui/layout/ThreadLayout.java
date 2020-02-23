@@ -75,6 +75,7 @@ import static com.github.adamantcheese.chan.utils.AndroidUtils.getClipboardManag
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getQuantityString;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.hideKeyboard;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.isAndroidQ;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.openLinkInBrowser;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.removeFromParentView;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.showToast;
@@ -603,10 +604,18 @@ public class ThreadLayout
                 String text = getQuantityString(R.plurals.thread_new_posts, more, more);
 
                 newPostsNotification = Snackbar.make(this, text, Snackbar.LENGTH_LONG);
+
+                if (isAndroidQ()) {
+                    // To avoid having snackbar appear higher than it should be on Android Q due to
+                    // bottom gesture insets
+                    newPostsNotification.setGestureInsetBottomIgnored(true);
+                }
+
                 newPostsNotification.setAction(R.string.thread_new_posts_goto, v -> {
                     presenter.onNewPostsViewClicked();
                     dismissSnackbar();
                 }).show();
+
                 fixSnackbarText(getContext(), newPostsNotification);
             } else {
                 dismissSnackbar();
