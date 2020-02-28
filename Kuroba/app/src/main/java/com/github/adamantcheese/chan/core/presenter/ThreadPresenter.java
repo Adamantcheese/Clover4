@@ -132,6 +132,7 @@ public class ThreadPresenter
     private final MockReplyManager mockReplyManager;
 
     private ThreadPresenterCallback threadPresenterCallback;
+    @Nullable
     private Loadable loadable;
     private ChanThreadLoader chanLoader;
     private boolean searchOpen;
@@ -338,7 +339,7 @@ public class ThreadPresenter
     }
 
     public boolean pin() {
-        if (!isBound()) return false;
+        if (!isBound() || loadable == null) return false;
         Pin pin = watchManager.findPinByLoadableId(loadable.id);
         if (pin == null) {
             if (chanLoader.getThread() != null) {
@@ -367,7 +368,7 @@ public class ThreadPresenter
     }
 
     public boolean save() {
-        if (!isBound()) return false;
+        if (!isBound() || loadable == null) return false;
         Pin pin = watchManager.findPinByLoadableId(loadable.id);
         if (pin == null || !PinType.hasDownloadFlag(pin.pinType)) {
             boolean startedSaving = saveInternal();
@@ -396,7 +397,7 @@ public class ThreadPresenter
     }
 
     private boolean saveInternal() {
-        if (chanLoader.getThread() == null) {
+        if (chanLoader.getThread() == null || loadable == null) {
             Logger.e(TAG, "chanLoader.getThread() == null");
             return false;
         }
@@ -459,7 +460,7 @@ public class ThreadPresenter
     }
 
     public boolean isPinned() {
-        if (!isBound()) return false;
+        if (!isBound() || loadable == null) return false;
         Pin pin = watchManager.findPinByLoadableId(loadable.id);
         if (pin == null) return false;
         return PinType.hasWatchNewPostsFlag(pin.pinType);
@@ -532,6 +533,10 @@ public class ThreadPresenter
     @Override
     public void onChanLoaderData(ChanThread result) {
         BackgroundUtils.ensureMainThread();
+
+        if (loadable == null) {
+            return;
+        }
 
         if (isBound()) {
             if (isWatching()) {
@@ -652,6 +657,10 @@ public class ThreadPresenter
     }
 
     private void storeNewPostsIfThreadIsBeingDownloaded(List<Post> posts) {
+        if (loadable == null) {
+            return;
+        }
+
         if (posts.isEmpty() || loadable.isCatalogMode()
                 || loadable.getLoadableDownloadingState() == Loadable.LoadableDownloadingState.AlreadyDownloaded) {
             return;
@@ -695,7 +704,7 @@ public class ThreadPresenter
      */
     @Override
     public void onListScrolledToBottom() {
-        if (!isBound()) return; //null loadable means no thread loaded, possibly unbinding?
+        if (!isBound() || loadable == null) return; //null loadable means no thread loaded, possibly unbinding?
         if (chanLoader.getThread() != null && loadable.isThreadMode() && chanLoader.getThread().getPostsCount() > 0) {
             List<Post> posts = chanLoader.getThread().getPosts();
             loadable.setLastViewed(posts.get(posts.size() - 1).no);
@@ -716,6 +725,10 @@ public class ThreadPresenter
     }
 
     public void onNewPostsViewClicked() {
+        if (loadable == null) {
+            return;
+        }
+
         if (isBound()) {
             Post post = PostUtils.findPostById(loadable.lastViewed, chanLoader.getThread());
             int position = -1;
@@ -812,6 +825,10 @@ public class ThreadPresenter
      */
     @Override
     public void onPostClicked(Post post) {
+        if (loadable == null) {
+            return;
+        }
+
         if (isBound() && loadable.isCatalogMode()) {
             Loadable newLoadable =
                     Loadable.forThread(loadable.site, post.board, post.no, PostHelper.getTitle(post, loadable));
@@ -824,6 +841,10 @@ public class ThreadPresenter
 
     @Override
     public void onPostDoubleClicked(Post post) {
+        if (loadable == null) {
+            return;
+        }
+
         if (isBound() && loadable.isThreadMode()) {
             if (searchOpen) {
                 searchQuery = null;
@@ -867,7 +888,7 @@ public class ThreadPresenter
 
     @Override
     public Object onPopulatePostOptions(Post post, List<FloatingMenuItem> menu, List<FloatingMenuItem> extraMenu) {
-        if (!isBound()) return null;
+        if (!isBound() || loadable == null) return null;
         if (loadable.isCatalogMode()) {
             menu.add(new FloatingMenuItem(POST_OPTION_PIN, R.string.action_pin));
         } else if (!loadable.isLocal()) {
@@ -928,6 +949,10 @@ public class ThreadPresenter
     }
 
     public void onPostOptionClicked(Post post, Object id, boolean inPopup) {
+        if (loadable == null) {
+            return;
+        }
+
         switch ((Integer) id) {
             case POST_OPTION_QUOTE:
                 threadPresenterCallback.hidePostsPopup();
@@ -1044,6 +1069,10 @@ public class ThreadPresenter
 
     @Override
     public void onPostLinkableClicked(Post post, PostLinkable linkable) {
+        if (loadable == null) {
+            return;
+        }
+
         if (linkable.type == PostLinkable.Type.QUOTE && isBound()) {
             Post linked = PostUtils.findPostById((int) linkable.value, chanLoader.getThread());
             if (linked != null) {
@@ -1126,6 +1155,10 @@ public class ThreadPresenter
 
     @Override
     public boolean isWatching() {
+        if (loadable == null) {
+            return false;
+        }
+
         //@formatter:off
         return loadable.isThreadMode()
             && ChanSettings.autoRefreshThread.get()
@@ -1149,7 +1182,7 @@ public class ThreadPresenter
 
     @Override
     public void onListStatusClicked() {
-        if (!isBound()) return;
+        if (!isBound() || loadable == null) return;
         //noinspection ConstantConditions
         if (!chanLoader.getThread().isArchived()) {
             chanLoader.requestMoreDataAndResetTimer();
@@ -1178,6 +1211,10 @@ public class ThreadPresenter
 
     @Override
     public void requestNewPostLoad() {
+        if (loadable == null) {
+            return;
+        }
+
         if (isBound() && loadable.isThreadMode()) {
             chanLoader.requestMoreDataAndResetTimer();
             //put in a "request" for a page update whenever the next set of data comes in
@@ -1256,8 +1293,11 @@ public class ThreadPresenter
             text.append("\nId: ").append(post.id);
             int count = 0;
             try {
-                for (Post p : chanLoader.getThread().getPosts()) {
-                    if (p.id.equals(post.id)) count++;
+                ChanThread thread = chanLoader.getThread();
+                if (thread != null) {
+                    for (Post p : thread.getPosts()) {
+                        if (p.id.equals(post.id)) count++;
+                    }
                 }
             } catch (Exception ignored) {
             }
@@ -1301,7 +1341,7 @@ public class ThreadPresenter
     }
 
     private void addHistory() {
-        if (!isBound() || chanLoader.getThread() == null) {
+        if (!isBound() || loadable == null || chanLoader.getThread() == null) {
             return;
         }
 
@@ -1339,6 +1379,10 @@ public class ThreadPresenter
     }
 
     public void showRemovedPostsDialog() {
+        if (loadable == null) {
+            return;
+        }
+
         if (chanLoader == null || chanLoader.getThread() == null || loadable.isCatalogMode()) {
             return;
         }
@@ -1354,6 +1398,10 @@ public class ThreadPresenter
 
     @Override
     public void openArchive(Pair<String, String> domainNamePair) {
+        if (loadable == null) {
+            return;
+        }
+
         if (isBound()) {
             String link = loadable.desktopUrl();
             link = link.replace("https://boards.4chan.org/", "https://" + domainNamePair.second + "/");
@@ -1366,13 +1414,17 @@ public class ThreadPresenter
     }
 
     public void updateLoadable(Loadable.LoadableDownloadingState loadableDownloadingState) {
+        if (loadable == null) {
+            return;
+        }
+
         if (isBound()) {
             loadable.setLoadableState(loadableDownloadingState);
         }
     }
 
     public void markAllPostsAsSeen() {
-        if (!isBound()) return;
+        if (!isBound() || loadable == null) return;
         Pin pin = watchManager.findPinByLoadableId(loadable.id);
         if (pin != null) {
             SavedThread savedThread = null;
