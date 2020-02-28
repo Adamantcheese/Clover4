@@ -22,6 +22,7 @@ import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.SavedReply;
 import com.github.adamantcheese.chan.core.repository.SiteRepository;
 import com.github.adamantcheese.chan.core.site.Site;
+import com.github.adamantcheese.chan.utils.Logger;
 import com.j256.ormlite.stmt.DeleteBuilder;
 import com.j256.ormlite.stmt.QueryBuilder;
 import com.j256.ormlite.table.TableUtils;
@@ -49,6 +50,9 @@ public class DatabaseSavedReplyManager {
 
     @Inject
     DatabaseHelper helper;
+
+    @Inject
+    SiteRepository siteRepository;
 
     private final Map<Integer, List<SavedReply>> savedRepliesByNo = new HashMap<>();
 
@@ -159,7 +163,16 @@ public class DatabaseSavedReplyManager {
                     builder.where().eq("site", board.siteId).and().eq("board", board.code).and().eq("no", no).query();
             if (query.isEmpty()) return null;
             SavedReply savedReply = query.get(0);
-            savedReply.site = instance(SiteRepository.class).forId(savedReply.siteId);
+            savedReply.site = siteRepository.forId(savedReply.siteId);
+
+            int siteRepositorySiteCount = siteRepository.all().getAll().size();
+            if (savedReply.site == null) {
+                // We are probably about to crash so might as well print some additional info
+                Logger.e(TAG, "savedReply.site == null, savedReply.siteId = " +
+                        savedReply.siteId + ", board.siteId = " +
+                        board.siteId + ", site count = " + siteRepositorySiteCount);
+            }
+
             return savedReply;
         };
     }
