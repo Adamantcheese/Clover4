@@ -236,6 +236,7 @@ public class WebmStreamingDataSource
     private long fileLength = C.LENGTH_UNSET;
 
     private boolean prepared = false;
+    private boolean opened = false;
 
     public WebmStreamingDataSource(@Nullable Uri uri, RawFile file, FileManager fileManager) {
         super(/* isNetwork= */ true);
@@ -311,13 +312,13 @@ public class WebmStreamingDataSource
         activeRegionStats = partialFileCache.getRegionStats(new Range<>(pos, end));
         httpActiveRange = null;
 
-        Logger.i(TAG, "bytes remaining: " + bytesRemaining);
         if (bytesRemaining < 0) {
             throw new EOFException();
         }
 
         transferStarted(dataSpec);
-
+        opened = true;
+        
         return bytesRemaining;
     }
 
@@ -411,14 +412,16 @@ public class WebmStreamingDataSource
     }
 
     @Override
-    public void close()
-            throws IOException {
-        Logger.i(TAG, "close");
-        clearListeners();
-        if (dataSource != null) {
-            dataSource.close();
-            transferEnded();
-            dataSource = null;
+    public void close() throws IOException {
+        try {
+            if (dataSource != null) {
+                dataSource.close();
+            }
+        } finally {
+            if (opened) {
+                opened = false;
+                transferEnded();
+            }
         }
     }
 
