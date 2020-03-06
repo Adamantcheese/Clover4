@@ -352,6 +352,7 @@ Note that for country code filtering, troll country codes should be prepended wi
 
     <string name="report_screen">Report %1$s</string>
 
+    <string name="image_save_notification_cancelling">Cancelling image downloading…</string>
     <string name="image_save_notification_downloading">Downloading images…</string>
     <string name="image_save_notification_cancel">Tap to cancel</string>
     <string name="image_save_saved">Image saved</string>

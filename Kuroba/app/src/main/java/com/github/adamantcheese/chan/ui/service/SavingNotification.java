@@ -73,39 +73,55 @@ public class SavingNotification
         if (intent != null && intent.getExtras() != null) {
             Bundle extras = intent.getExtras();
 
+            Notification notification;
+
             if (extras.getBoolean(CANCEL_KEY)) {
                 postToEventBus(new SavingCancelRequestMessage());
+                notification = getCancellingNotification();
             } else {
                 doneTasks = extras.getInt(DONE_TASKS_KEY);
                 totalTasks = extras.getInt(TOTAL_TASKS_KEY);
-                startForeground(NOTIFICATION_ID, getNotification());
+                notification = getDownloadingNotification();
             }
+
+            startForeground(NOTIFICATION_ID, notification);
         }
 
         return START_STICKY;
     }
 
-    private Notification getNotification() {
-        synchronized (this) {
-            Intent intent = new Intent(this, SavingNotification.class);
-            intent.putExtra(CANCEL_KEY, true);
-            PendingIntent pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+    private Notification getCancellingNotification() {
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(getAppContext()).setSmallIcon(R.drawable.ic_stat_notify)
+                        .setContentTitle(getString(R.string.image_save_notification_cancelling))
+                        .setOngoing(true);
 
-            NotificationCompat.Builder builder =
-                    new NotificationCompat.Builder(getAppContext()).setSmallIcon(R.drawable.ic_stat_notify)
-                            .setContentTitle(getString(R.string.image_save_notification_downloading))
-                            .setContentText(getString(R.string.image_save_notification_cancel))
-                            .setProgress(totalTasks, doneTasks, false)
-                            .setContentInfo(doneTasks + "/" + totalTasks)
-                            .setContentIntent(pendingIntent)
-                            .setOngoing(true);
-
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder.setChannelId(NOTIFICATION_ID_STR);
-            }
-
-            return builder.build();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder.setChannelId(NOTIFICATION_ID_STR);
         }
+
+        return builder.build();
+    }
+
+    private Notification getDownloadingNotification() {
+        Intent intent = new Intent(this, SavingNotification.class);
+        intent.putExtra(CANCEL_KEY, true);
+        PendingIntent pendingIntent = PendingIntent.getService(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(getAppContext()).setSmallIcon(R.drawable.ic_stat_notify)
+                        .setContentTitle(getString(R.string.image_save_notification_downloading))
+                        .setContentText(getString(R.string.image_save_notification_cancel))
+                        .setProgress(totalTasks, doneTasks, false)
+                        .setContentInfo(doneTasks + "/" + totalTasks)
+                        .setContentIntent(pendingIntent)
+                        .setOngoing(true);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            builder.setChannelId(NOTIFICATION_ID_STR);
+        }
+
+        return builder.build();
     }
 
     public static class SavingCancelRequestMessage {}
