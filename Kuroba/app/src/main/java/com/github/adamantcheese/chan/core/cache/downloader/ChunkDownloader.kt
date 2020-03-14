@@ -131,6 +131,6 @@ internal class ChunkDownloader(
     companion object {
         private const val TAG = "ChunkDownloader"
         private const val RANGE_HEADER = "Range"
-        private const val RANGE_HEADER_VALUE_FORMAT = "bytes=%d-%d"
-    }
+        private const val RANGE_HEADER_VALUE_FORMAT = (Locale.ENGLISH, "bytes=%d-%d")
+      }
 }
