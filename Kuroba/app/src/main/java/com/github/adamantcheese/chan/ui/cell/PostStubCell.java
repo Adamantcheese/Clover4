@@ -90,23 +90,28 @@ public class PostStubCell
 
         options.setOnClickListener(v -> {
             List<FloatingMenuItem> items = new ArrayList<>();
-            List<FloatingMenuItem> extraItems = new ArrayList<>();
-            Object extraOption = callback.onPopulatePostOptions(post, items, extraItems);
-            showOptions(v, items, extraItems, extraOption);
+            List<List<FloatingMenuItem>> extraItems = new ArrayList<>();
+            extraItems.add(new ArrayList<>());
+            extraItems.add(new ArrayList<>());
+            List<Object> extraOptions = callback.onPopulatePostOptions(post, items, extraItems);
+            showOptions(v, items, extraItems, extraOptions);
         });
     }
 
     private void showOptions(
-            View anchor, List<FloatingMenuItem> items, List<FloatingMenuItem> extraItems, Object extraOption
+            View anchor, List<FloatingMenuItem> items, List<List<FloatingMenuItem>> extraItems, List<Object> extraOptions
     ) {
         FloatingMenu menu = new FloatingMenu(getContext(), anchor, items);
         menu.setCallback(new FloatingMenu.FloatingMenuCallback() {
             @Override
             public void onFloatingMenuItemClicked(FloatingMenu menu, FloatingMenuItem item) {
-                if (item.getId() == extraOption) {
-                    showOptions(anchor, extraItems, null, null);
+                if (extraItems != null && extraOptions != null) {
+                    if (item.getId() == extraOptions.get(0)) {
+                        showOptions(anchor, extraItems.get(0), null, null);
+                    } else if (item.getId() == extraOptions.get(1)) {
+                        showOptions(anchor, extraItems.get(1), null, null);
+                    }
                 }
-
                 callback.onPostOptionClicked(post, item.getId(), false);
             }
 

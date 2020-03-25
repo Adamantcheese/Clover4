@@ -118,9 +118,9 @@ public class ThemeSettingsController
         }
 
         @Override
-        public Object onPopulatePostOptions(Post post, List<FloatingMenuItem> menu, List<FloatingMenuItem> extraMenu) {
+        public List<Object> onPopulatePostOptions(Post post, List<FloatingMenuItem> menu, List<List<FloatingMenuItem>> extraMenus) {
             menu.add(new FloatingMenuItem(1, "Option"));
-            return 0;
+            return null;
         }
 
         @Override
