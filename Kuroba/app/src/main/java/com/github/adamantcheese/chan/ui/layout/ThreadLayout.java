@@ -455,8 +455,8 @@ public class ThreadLayout
     }
 
     @Override
-    public void filterPostID(String ID) {
-        callback.openFilterForType(FilterType.ID, ID);
+    public void filterPostID(String id) {
+        callback.openFilterForType(FilterType.ID, id);
     }
 
     @Override
