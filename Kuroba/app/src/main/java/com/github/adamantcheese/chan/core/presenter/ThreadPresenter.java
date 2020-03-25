@@ -896,10 +896,10 @@ public class ThreadPresenter
                 menu.add(new FloatingMenuItem(POST_OPTION_HIGHLIGHT_TRIPCODE, R.string.post_highlight_tripcode));
                 menu.add(new FloatingMenuItem(POST_OPTION_FILTER_TRIPCODE, R.string.post_filter_tripcode));
             }
+        }
 
-            if (loadable.site.siteFeature(Site.SiteFeature.IMAGE_FILE_HASH) && !post.images.isEmpty()) {
-                menu.add(new FloatingMenuItem(POST_OPTION_FILTER_IMAGE_HASH, R.string.post_filter_image_hash));
-            }
+        if (loadable.site.siteFeature(Site.SiteFeature.IMAGE_FILE_HASH) && !post.images.isEmpty()) {
+            menu.add(new FloatingMenuItem(POST_OPTION_FILTER_IMAGE_HASH, R.string.post_filter_image_hash));
         }
 
         if (loadable.site.siteFeature(Site.SiteFeature.POST_DELETE) && databaseManager.getDatabaseSavedReplyManager()
