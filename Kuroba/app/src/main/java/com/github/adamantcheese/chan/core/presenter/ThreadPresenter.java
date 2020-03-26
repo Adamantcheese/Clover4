@@ -924,7 +924,8 @@ public class ThreadPresenter
         if (!TextUtils.isEmpty(post.tripcode)) {
             filterMenu.add(new FloatingMenuItem(POST_OPTION_FILTER_TRIPCODE, R.string.filter_tripcode));
         }
-        if (loadable.board.countryFlags || loadable.boardCode.equals("pol")) {
+        if (loadable.board.countryFlags || (loadable.board.site.name().equals("4chan") &&
+                loadable.board.code.equals("pol"))) {
             filterMenu.add(new FloatingMenuItem(POST_OPTION_FILTER_COUNTRY_CODE, R.string.filter_country_code));
         }
         if (!post.images.isEmpty()) {
