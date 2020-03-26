@@ -909,7 +909,6 @@ public class ThreadPresenter
             }
         }
 
-        menu.add(new FloatingMenuItem(POST_OPTION_FILTER, R.string.post_filter));
         if (post.isOP && !TextUtils.isEmpty(post.subject)) {
             filterMenu.add(new FloatingMenuItem(POST_OPTION_FILTER_SUBJECT, R.string.filter_subject));
         }
@@ -933,6 +932,17 @@ public class ThreadPresenter
             if (loadable.site.siteFeature(Site.SiteFeature.IMAGE_FILE_HASH)) {
                 filterMenu.add(new FloatingMenuItem(POST_OPTION_FILTER_IMAGE_HASH, R.string.filter_image_hash));
             }
+        }
+
+        //if the filter menu only has a single option we place just that option in the root menu
+        //in some cases a post will have nothing in it to filter (for example a post with no text and an image
+        //that is removed by a filter), in such cases there is no filter menu option.
+        if (filterMenu.size() > 1) {
+            menu.add(new FloatingMenuItem(POST_OPTION_FILTER, R.string.post_filter));
+        } else if (filterMenu.size() == 1) {
+            FloatingMenuItem menuItem = filterMenu.remove(0);
+            menuItem.setText("Filter " + menuItem.getText().toLowerCase());
+            menu.add(menuItem);
         }
 
 
