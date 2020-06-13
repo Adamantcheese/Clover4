@@ -401,7 +401,7 @@ public class Chan4
 			    if(isLoggedIn()) {
 				// therefore there exists a pass, but the IP is wrong
 				// horrible horrible hack
-			        var t_pass = passToken.get();
+			        String t_pass = passToken.get();
 				passToken.set("");
 				post(reply, postListener);
 				passToken.set(t_pass);
