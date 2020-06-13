@@ -398,7 +398,16 @@ public class Chan4
 
                         @Override
                         public void onHttpFail(CommonReplyHttpCall httpPost, Exception e) {
-                            postListener.onPostError(httpPost, e);
+			    if(isLoggedIn()) {
+				// therefore there exists a pass, but the IP is wrong
+				// horrible horrible hack
+			        var t_pass = passToken.get();
+				passToken.set("");
+				post(reply, postListener);
+				passToken.set(t_pass);
+			    } else {
+				postListener.onPostError(httpPost, e);
+			    }
                         }
                     },
                     postListener::onUploadingProgress
@@ -407,6 +416,7 @@ public class Chan4
 
         @Override
         public boolean postRequiresAuthentication() {
+	    // check if I'm logged in and the IP is the currently authorized one
             return !isLoggedIn();
         }
 
