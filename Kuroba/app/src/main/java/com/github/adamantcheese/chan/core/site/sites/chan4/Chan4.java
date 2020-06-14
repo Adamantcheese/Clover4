@@ -416,7 +416,6 @@ public class Chan4
 
         @Override
         public boolean postRequiresAuthentication() {
-	    // check if I'm logged in and the IP is the currently authorized one
             return !isLoggedIn();
         }
 

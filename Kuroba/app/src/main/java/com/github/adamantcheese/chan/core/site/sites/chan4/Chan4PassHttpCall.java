@@ -61,8 +61,6 @@ public class Chan4PassHttpCall
         boolean authSuccess = false;
         if (result.contains("Success! Your device is now authorized")) {
             authSuccess = true;
-        } else if (result.contains("This 4chan Pass is currently in use by another IP")) {
-	    // switch to using a captcha prompt
 	} else {
             String message;
             if (result.contains("Your Token must be exactly 10 characters")) {
