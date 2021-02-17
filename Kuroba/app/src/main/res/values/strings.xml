@@ -97,17 +97,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <string name="update_later">Later</string>
     <string name="update_none">Already on the latest %1$s version.</string>
-    <string name="update_check_failed">Failed to check for updates.</string>
+    <string name="update_check_failed">Could not fetch updates.</string>
     <string name="update_install">Install</string>
     <string name="update_install_downloading">Downloading update…</string>
     <string name="update_install_download_failed">Download failed</string>
     <string name="update_install_download_failed_description">Reason: %1$s</string>
     <string name="update_retry_title">Retry update</string>
-    <string name="update_retry">%1$s was not updated yet. Tap \"retry\" to retry the install.</string>
+    <string name="update_retry">%1$s not updated yet. Tap \"retry\" to retry the install.</string>
     <string name="update_retry_button">Retry</string>
     <string name="update_storage_permission_required_title">Storage permission required</string>
     <string name="update_storage_permission_required">
-"Permission to access storage is required for installing the update.
+"Grant access storage permission to install the update.
 
 Re-enable this permission in the app settings if you permanently disabled it."</string>
 
@@ -115,7 +115,7 @@ Re-enable this permission in the app settings if you permanently disabled it."</
     <string name="card_stats">%1$dR %2$dI</string>
     <string name="action_reload">Reload</string>
     <string name="action_pin">Bookmark</string>
-    <string name="action_open_browser">Open in a browser</string>
+    <string name="action_open_browser">Open in a web browser</string>
     <string name="action_share">Share</string>
     <string name="action_download_album">Download album</string>
     <string name="action_transparency_toggle">Toggle opacity</string>
@@ -129,7 +129,7 @@ Re-enable this permission in the app settings if you permanently disabled it."</
     <string name="action_scroll_to_bottom">Bottom</string>
     <string name="action_sort">Sort</string>
     <string name="action_reply">Reply</string>
-    <string name="open_link_not_matched">%1$s cannot open this link; it will open in your browser instead.</string>
+    <string name="open_link_not_matched">%1$s cannot open this link; it will open in your web browser instead.</string>
 
     <string name="order_bump">Bump order</string>
     <string name="order_reply">Reply count</string>
@@ -145,25 +145,25 @@ Re-enable this permission in the app settings if you permanently disabled it."</
     <string name="open_link_confirmation">Open this link?</string>
     <string name="open_thread_confirmation">Open this thread?</string>
     <string name="open_archived_thread_confirmation">Open this archived thread?</string>
-    <string name="open_link_failed">No applications were found to open this link</string>
-    <string name="open_file_picker_failed">No file picker applications were found</string>
+    <string name="open_link_failed">Install an app that can open this link first</string>
+    <string name="open_file_picker_failed">Install a file picker app first</string>
     <string name="image_pick_delegate_select_file_picker">Select a file picker to open a file…</string>
 
     <string name="thumbnail_load_failed_network">Error</string>
-    <string name="image_preview_failed">Failed to show image</string>
-    <string name="image_preview_failed_oom">Failed to show image (out of memory)</string>
-    <string name="image_failed_big_image">Failed to show image (deep-zoom loading failed)</string>
+    <string name="image_preview_failed">Could not show image</string>
+    <string name="image_preview_failed_oom">Ran out of memory before image could be shown</string>
+    <string name="image_failed_big_image">Could not load deep-zoom when trying to load image</string>
     <string name="image_not_found">Image not found</string>
     <string name="image_spoiler_filename">Spoilered file</string>
     <string name="image_hidden_filename">Hidden file</string>
     <string name="thread_boards_search_hint">Search</string>
     <string name="thread_load_failed_ssl">HTTPS error</string>
     <string name="thread_load_failed_network">Network error</string>
-    <string name="thread_load_failed_parsing">API parse error</string>
+    <string name="thread_load_failed_parsing">API parsing error</string>
     <string name="thread_load_failed_server">Server error</string>
-    <string name="thread_load_failed_not_found">404 not found</string>
+    <string name="thread_load_failed_not_found">What you are looking for doesn\'t exist</string>
     <string name="thread_refresh_bar_inactive">Tap to refresh</string>
-    <string name="thread_refresh_countdown">Loading in %1$ds</string>
+    <string name="thread_refresh_countdown">Loading in %1$ds…</string>
     <string name="thread_load_failed_retry">Retry</string>
     <string name="thread_archived">Archived</string>
     <string name="thread_closed">Closed</string>
@@ -171,7 +171,7 @@ Re-enable this permission in the app settings if you permanently disabled it."</
 
     <string name="thread_new_posts_goto">View</string>
     <string name="thread_empty_select">Please select a thread</string>
-    <string name="thread_up_down_hint">Scroll to top/bottom</string>
+    <string name="thread_up_down_hint">Scroll ⭱/⭳</string>
     <string name="thread_pin_hint">Bookmark this thread</string>
     <string name="thread_album_hint">View thread album</string>
 
@@ -185,17 +185,17 @@ Re-enable this permission in the app settings if you permanently disabled it."</
     <string name="setup_sites_add_hint">Add a site here</string>
 
     <string name="setup_sites_add_boards_hint">Tap to add boards</string>
-    <string name="setup_site_title">Configure %s</string>
+    <string name="setup_site_title">Set up %s</string>
     <string name="setup_site_group_general">General</string>
 
     <string name="setup_site_boards">Set up boards</string>
     <string name="setup_site_boards_description">%s added</string>
     <string name="setup_site_group_login">Authentication</string>
-    <string name="setup_site_login">Login</string>
+    <string name="setup_site_login">Log in</string>
     <string name="setup_site_login_description_enabled">Logged in</string>
 
     <string name="setup_site_login_description_disabled">Off</string>
-    <string name="setup_board_title">Configure boards of %s</string>
+    <string name="setup_board_title">Select %s boards</string>
     <string name="setup_board_empty">No boards added</string>
     <string name="setup_board_removed">Removed \"%s\"</string>
     <string name="setup_board_added">%s added</string>
@@ -316,9 +316,9 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="reply_subject">Subject</string>
     <string name="reply_comment_thread">Comment reply</string>
     <string name="reply_comment_board">Comment new thread</string>
-    <string name="reply_file_name">File name</string>
-    <string name="reply_file_too_big">Warning: File size too big (%1$s / %2$s)</string>
-    <string name="reply_webm_too_big">Warning: WebM size too big (%1$s / %2$s)</string>
+    <string name="reply_file_name">Filename</string>
+    <string name="reply_file_too_big">Warning: File size too big (%1$s/%2$s)</string>
+    <string name="reply_webm_too_big">Warning: WebM size too big (%1$s/%2$s)</string>
     <string name="reply_file_open_failed">Failed to open file</string>
     <string name="reply_spoiler_image">Spoiler image</string>
     <string name="reply_no_preview">No preview</string>
@@ -342,15 +342,15 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
 
     <string name="delete_confirm">Delete your post?</string>
     <string name="delete_wait">Deleting post…</string>
-    <string name="delete_success">Post deleted</string>
+    <string name="delete_success">Deleted</string>
     <string name="delete_image_only">Only delete the image</string>
-    <string name="delete_error">Error deleting post</string>
+    <string name="delete_error">Could not delete post</string>
 
     <string name="watch_pause_pins">Stop watching</string>
 
     <string name="filters_screen">Filters</string>
 
-    <string name="album_download_screen">Select images (%1$d / %2$d)</string>
+    <string name="album_download_screen">Select images (%1$d/%2$d)</string>
     <string name="album_download_none_checked">Please select images to download</string>
     <string name="album_download_confirm">%1$s will be downloaded to %2$s</string>
     <string name="image_saver_album_download_success">Finished saving images; downloaded to %1$s</string>
@@ -375,7 +375,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="settings_appearance">Appearance</string>
     <string name="settings_appearance_description">Theme, layout, fonts, etc.</string>
     <string name="settings_behavior">Behavior</string>
-    <string name="settings_behavior_description">Thread refresh, captcha, etc.</string>
+    <string name="settings_behavior_description">Thread refresh, CAPTCHA, etc.</string>
     <string name="settings_media">Media</string>
     <string name="settings_media_description">Save location, auto loading, etc.</string>
     <string name="settings_filters">Filters</string>
@@ -387,10 +387,10 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
 
     <string name="settings_screen_watch">Thread watcher settings</string>
     <string name="settings_group_watch">Settings</string>
-    <string name="setting_watch_enable_background">Enable in background</string>
-    <string name="setting_watch_enable_background_description">Watch bookmarks when app is in the background</string>
+    <string name="setting_watch_enable_background">Background watching</string>
+    <string name="setting_watch_enable_background_description">Keep track of bookmarks when the app is in the background</string>
     <string name="setting_watch_background_timeout">Background update interval</string>
-    <string name="setting_watch_background_timeout_description">The interval between updates when placed in the background</string>
+    <string name="setting_watch_background_timeout_description">Time between updates when the app is in the background</string>
     <string name="setting_thread_page_limit_notify">Last page notifications</string>
     <string name="setting_thread_page_limit_notify_description">Notify when threads hit the last page</string>
     <string name="setting_watch_notify_mode">Notify about</string>
@@ -398,12 +398,12 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_watch_peek">Heads-up notification on quotes</string>
     <string name="setting_watch_peek_description">Show a heads-up notification when quoted</string>
     <string name="settings_group_about">About</string>
-    <string name="settings_about_license">Released under the GNU GPLv3 license</string>
+    <string name="settings_about_license">Copyelfted libre software, licensed GPLv3</string>
 
     <!-- Main About group -->
-    <string name="settings_about_license_description">Tap to see license</string>
-    <string name="settings_about_licenses">Open Source Licenses</string>
-    <string name="settings_about_licenses_description">Legal information about licenses</string>
+    <string name="settings_about_license_description">Tap to show license</string>
+    <string name="settings_about_licenses">Libre Software Licenses</string>
+    <string name="settings_about_licenses_description">Legal info about licenses</string>
     <string name="settings_developer">Developer settings</string>
     <string name="settings_screen_appearance">Appearance</string>
     <string name="settings_group_appearance">Appearance</string>
@@ -414,15 +414,15 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_layout_mode">Layout mode</string>
 
     <!-- Appearance layout group -->
-    <string name="setting_board_grid_span_count_portrait">Catalog mode column count (portrait)</string>
-    <string name="setting_album_grid_span_count_portrait">Album mode column count (portrait)</string>
-    <string name="setting_board_grid_span_count_landscape">Catalog mode column count (landscape)</string>
-    <string name="setting_album_grid_span_count_landscape">Album mode column count (landscape)</string>
+    <string name="setting_board_grid_span_count_portrait">Catalog mode column count (▯)</string>
+    <string name="setting_album_grid_span_count_portrait">Album mode column count (▯)</string>
+    <string name="setting_board_grid_span_count_landscape">Catalog mode column count (▭)</string>
+    <string name="setting_album_grid_span_count_landscape">Album mode column count (▭)</string>
     <string name="setting_grid_span_count_default">Auto</string>
     <string name="setting_grid_span_count_item">%1$d columns</string>
     <string name="setting_never_hide_toolbar">Never hide the toolbar</string>
-    <string name="setting_enable_reply_fab">Enable the reply button</string>
-    <string name="setting_enable_reply_fab_description">Disabling replaces the round button with a menu option</string>
+    <string name="setting_enable_reply_fab">Reply button</string>
+    <string name="setting_enable_reply_fab_description">Round button instead of just a menu option</string>
     <string name="settings_group_post">Post</string>
     <string name="setting_font_size">Font size</string>
     <string name="setting_thumbnail_scale">Thumbnail scale</string>
@@ -430,7 +430,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_move_sort_to_toolbar_description">Move board sort option from submenu to toolbar</string>
 
     <!-- Appearance post group -->
-    <string name="setting_font_alt">Use alternative font</string>
+    <string name="setting_font_alt">Alternative font</string>
     <string name="setting_font_alt_description">Use the theme\'s alt font for posts</string>
     <string name="setting_post_full_date">Show the full date on posts</string>
     <string name="setting_post_file_info">Show file info on posts</string>
@@ -438,40 +438,40 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="settings_group_images">Images</string>
 
     <!-- Appearance gallery group -->
-    <string name="setting_hide_images">Hide images</string>
-    <string name="setting_hide_images_description">Hides images when with a special spoiler image. If you want to save on data, turn this on.</string>
-    <string name="setting_images_immersive_mode_title">Use immersive mode for image gallery</string>
-    <string name="setting_images_immersive_mode_description">This will make image gallery view be fullscreen with statusbar/navbar hidden</string>
+    <string name="setting_hide_images">On-demand images</string>
+    <string name="setting_hide_images_description">Special spoiler intead of images. Saves data.</string>
+    <string name="setting_images_immersive_mode_title">Immersive mode for image gallery</string>
+    <string name="setting_images_immersive_mode_description">Fullscreen gallery view with statusbar/navbar hidden</string>
     <string name="settings_screen_behavior">Behavior</string>
     <string name="settings_group_general">General</string>
     <string name="setting_auto_refresh_thread">Auto refresh threads</string>
 
     <!-- Behavior -->
-    <string name="setting_controller_swipeable">Allow screens to be swiped away</string>
+    <string name="setting_controller_swipeable">Allow swiping away screens</string>
 
     <!-- Behavior general group -->
     <string name="setting_clear_thread_hides">Clear all thread hides</string>
     <string name="setting_cleared_thread_hides">Cleared all thread hides</string>
     <string name="settings_group_reply">Reply</string>
-    <string name="setting_post_pin">Bookmark thread on post</string>
+    <string name="setting_post_pin">Bookmark thread from posts</string>
     <string name="setting_post_default_name">Default post name</string>
 
     <!-- Behavior reply group -->
     <string name="setting_text_only">Text-only mode</string>
-    <string name="setting_text_only_description">Remove images when in board and thread view</string>
+    <string name="setting_text_only_description">Remove images when in board- and thread view</string>
     <string name="settings_reveal_text_spoilers">Reveal text spoilers</string>
 
     <!-- Behavior post group -->
     <string name="settings_reveal_text_spoilers_description">Makes the spoiler text appear tapped</string>
-    <string name="setting_anonymize">Make everyone Anonymous</string>
+    <string name="setting_anonymize">Make everyone anonymous</string>
     <string name="setting_anonymize_ids">Hide IDs</string>
     <string name="setting_show_anonymous_name">Always show \"Anonymous\" name</string>
-    <string name="setting_buttons_bottom">Popup window buttons on the bottom</string>
-    <string name="setting_volume_key_scrolling">Volume keys scroll content</string>
+    <string name="setting_buttons_bottom">Pop-up window-buttons on the bottom</string>
+    <string name="setting_volume_key_scrolling">Scroll content with volume</string>
     <string name="setting_open_link_confirmation">Ask before opening links</string>
-    <string name="setting_open_link_browser">Always open links in external browser</string>
-    <string name="settings_group_proxy">HTTP Proxy</string>
-    <string name="setting_proxy_enabled">Enable proxy</string>
+    <string name="setting_open_link_browser">Always open links in external web browser</string>
+    <string name="settings_group_proxy">HTTP proxy</string>
+    <string name="setting_proxy_enabled">Use proxy</string>
     <string name="setting_proxy_address">Proxy server address</string>
 
     <!-- Behavior proxy group -->
@@ -483,27 +483,27 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <!-- Media general group -->
     <string name="settings_group_saving">Media saving</string>
     <string name="setting_save_image_board_folder">Save images in board folders</string>
-    <string name="setting_save_image_board_folder_description">Create a folder for each board when saving individual images</string>
+    <string name="setting_save_image_board_folder_description">One folder for each board to save individual images in</string>
     <string name="setting_save_image_thread_folder">Save images in thread folders</string>
-    <string name="setting_save_image_thread_folder_description">Create a folder for each thread when saving individual images</string>
+    <string name="setting_save_image_thread_folder_description">One folder for each thread to save individual images in</string>
     <string name="setting_save_album_board_folder">Save albums in board folders</string>
-    <string name="setting_save_album_board_folder_description">Create a folder for each board when saving image albums</string>
+    <string name="setting_save_album_board_folder_description">One folder for each board to save image albums in</string>
     <string name="setting_save_album_thread_folder">Save albums in thread folders</string>
-    <string name="setting_save_album_thread_folder_description">Create a folder for each thread when saving image albums</string>
+    <string name="setting_save_album_thread_folder_description">One folder for each thread to save image albums in</string>
     <string name="setting_save_server_filename">Save server filename</string>
-    <string name="setting_save_server_filename_description">Save the image with the filename the site assigned. If disabled, save the image with the filename the uploader assigned.</string>
+    <string name="setting_save_server_filename_description">Give saved filenams the name the site assigned. Otherwise the filename the uploader assigned is used.</string>
     <string name="setting_video_default_muted">Start videos muted</string>
     <string name="setting_video_stream">Stream videos</string>
-    <string name="setting_video_stream_description">Attempt to stream videos, instead of downloading them completely. (Works really bad with 4chan servers)</string>
-    <string name="setting_video_default_muted_description">If a video has audio, mute it by default</string>
+    <string name="setting_video_stream_description">Attempt to stream videos, instead of downloading them completely. (Works really badly on 4chan servers)</string>
+    <string name="setting_video_default_muted_description">Videos are started with no audio</string>
     <string name="setting_headset_default_muted">Mute headset videos</string>
     <string name="setting_headset_default_muted_description">Mute the video even if a wired headset is connected</string>
-    <string name="setting_video_open_external">Play videos with external player</string>
-    <string name="setting_video_open_external_description">Play videos in an external media player app</string>
+    <string name="setting_video_open_external">Play videos in external player</string>
+    <string name="setting_video_open_external_description">Plays videos using an external media player app</string>
     <string name="setting_share_url">Share URL to image</string>
     <string name="setting_share_url_description">Share the URL to the image instead of the image itself</string>
     <string name="settings_remove_image_spoilers">Remove image spoilers</string>
-    <string name="settings_remove_image_spoilers_description">Always reveal spoiler thumbnails and images</string>
+    <string name="settings_remove_image_spoilers_description">Always show the content of spoiler thumbnails and images</string>
     <string name="settings_reveal_image_spoilers">Reveal image spoilers</string>
     <string name="settings_reveal_image_spoilers_description">Automatically reveal spoiler images, not thumbnails</string>
     <string name="settings_group_media_loading">Media loading</string>
@@ -514,32 +514,32 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_image_auto_load_wifi">Wi-Fi only</string>
     <string name="setting_image_auto_load_none">Never</string>
 
-    <string name="setting_video_auto_load">Automatically load videos</string>
-    <string name="setting_video_auto_loop">Enable automatic video-looping</string>
-    <string name="setting_video_auto_loop_description">Automatically loop video content</string>
-    <string name="setting_auto_load_thread_images">Enable media pre-fetching</string>
-    <string name="setting_auto_load_thread_images_description">Instead of loading thumbnails, pre-loads full size images into the file cache when thumbnails should be displayed and uses them for thumbnail display. Tapping a thumbnail will load the full size image directly from the cache.</string>
+    <string name="setting_video_auto_load">Auto-load videos</string>
+    <string name="setting_video_auto_loop">Automatic video-looping</string>
+    <string name="setting_video_auto_loop_description">Start videos from the beginning once finished</string>
+    <string name="setting_auto_load_thread_images">Media pre-fetching</string>
+    <string name="setting_auto_load_thread_images_description">Pre-loads fullsize images to show as thumbnails. Tapping thumbnails loads fullsize the pre-fetched image directly.</string>
     <string name="save_location_screen">Save location</string>
     <string name="save_location_storage_permission_required_title">Storage permission required</string>
     <string name="save_location_storage_permission_required">
-"Permission to access storage is required for browsing files.
+"Grant storage access permission to browse files.
 
 Re-enable this permission in the app settings if you permanently disabled it."
     </string>
 
     <!-- Save location settings -->
-    <string name="setting_folder_navigate_up">Up</string>
-    <string name="save_new_folder">Add a new folder</string>
+    <string name="setting_folder_navigate_up">↑</string>
+    <string name="save_new_folder">New folder…</string>
     <string name="new_folder_hint">Folder name</string>
     <string name="setting_theme_explanation">
-"Swipe to change the theme.
-Tap the toolbar menu to change its color.
-Tap the checkmark button when done.
+"← → to change theme.
+Tap the toolbar menu to change colour.
+Tap ✓ once done.
 
-If you're on Android 10+, the sun/moon toggle selects the theme used for the day or night theme if dark mode is enabled.
-Setting the themes to the same will function as if dark mode is effectively off. Note that the application will restart when the theme changes."
+On Android 10+, clicking the 🌣/☾ selects the theme used for the day or night theme if dark mode is on.
+Setting the themes to the same means nothing happens in dark mode. The app will restart to use theme changes."
     </string>
-    <string name="setting_theme_accent">Tap to change the accent color.</string>
+    <string name="setting_theme_accent">Tap to change accent color.</string>
     <string name="settings_open_logs">View logs</string>
 
     <!-- Theme settings -->
@@ -551,8 +551,8 @@ Setting the themes to the same will function as if dark mode is effectively off.
     <string name="setting_pass_token">Token</string>
     <string name="setting_pass_pin">PIN</string>
 
-    <string name="setting_pass_authenticated">Device authorized!</string>
-    <string name="setting_pass_logout">Logout</string>
+    <string name="setting_pass_authenticated">Device authorized</string>
+    <string name="setting_pass_logout">Log out</string>
     <string name="setting_pass_error">Connection error</string>
     <string name="setting_pass_bottom_description">"
 <![CDATA[
@@ -569,7 +569,7 @@ Don't have a 4chan Pass?<br>
 
     <string name="scale_reduce">Reduce: %1$dx%2$d to %3$dx%4$d (%5$d%%)</string>
     <string name="could_not_decode_image_bitmap">Could not decode image bitmap</string>
-    <string name="could_not_apply_image_options">Could not apply new image options (error message is %1$s)</string>
+    <string name="could_not_apply_image_options">Could not apply new image options because %1$s</string>
     <string name="image_options_change_image_checksum">Change image checksum</string>
     <string name="image_options_fix_exif">Fix EXIF orientation</string>
     <string name="reencode_image_re_encode_image_text">Re-encode %s image as</string>
@@ -578,13 +578,13 @@ Don't have a 4chan Pass?<br>
     <string name="tap_image_for_extra_options">Tap image for extra options</string>
 
     <string name="settings_import_export">Import/Export</string>
-    <string name="settings_import_export_description">Import/export settings/pins, etc.</string>
+    <string name="settings_import_export_description">Import/export settings/PINs, etc.</string>
     <string name="import_or_export_settings">Import/export settings</string>
     <string name="export_settings">Export settings</string>
     <string name="export_settings_to_a_file">Export settings to a file</string>
     <string name="import_settings">Import settings</string>
     <string name="import_settings_from_a_file">Import settings from a file</string>
-    <string name="successfully_exported_text">Exported successfully"</string>
+    <string name="successfully_exported_text">Exported"</string>
 
     <string name="apply_to_replies">Apply to replies</string>
     <string name="only_on_op">Only on OP</string>
@@ -594,8 +594,8 @@ Don't have a 4chan Pass?<br>
     <string name="thread_layout_remove_whole_chain">Remove whole chain</string>
     <string name="thread_layout_hide_post">Hide post</string>
     <string name="thread_layout_remove_post">Remove post</string>
-    <string name="thread_layout_hide_whole_chain_as_well">Would you like to hide the whole reply chain as well?</string>
-    <string name="thread_layout_remove_whole_chain_as_well">Would you like to remove the whole reply chain as well?</string>
+    <string name="thread_layout_hide_whole_chain_as_well">Hide the whole reply chain too?</string>
+    <string name="thread_layout_remove_whole_chain_as_well">Remove the whole reply chain too?</string>
     <string name="view_removed_posts">View removed posts</string>
     <string name="restore_posts">Restore posts</string>
     <string name="restored_n_posts">Restored %1$d posts</string>
@@ -603,39 +603,39 @@ Don't have a 4chan Pass?<br>
 
     <!-- Captcha settings -->
     <string name="captcha_layout_v2_verify_button_text">Verify</string>
-    <string name="captcha_layout_v2_use_old_captcha">Use old\ncaptcha</string>
+    <string name="captcha_layout_v2_use_old_captcha">Use old\nCAPTCHA</string>
 
-    <string name="captcha_layout_v2_you_have_to_select_at_least_one_image">You have to select at least one image (if you see a captcha that does not have any matching images, then it is probably a bug; fill an issue and use the old captcha)</string>
-    <string name="captcha_layout_v2_verification_already_in_progress">Verification is already in progress</string>
-    <string name="captcha_layout_v2_captcha_request_is_already_in_progress">Captcha request is already in progress</string>
-    <string name="captcha_layout_v2_you_are_requesting_captcha_too_fast">You are requesting captcha too fast</string>
+    <string name="captcha_layout_v2_you_have_to_select_at_least_one_image">Select at least one image (if you see a CAPTCHA that does not have any matching images you can file a bug and use the old one)</string>
+    <string name="captcha_layout_v2_verification_already_in_progress">Verification already in progress…</string>
+    <string name="captcha_layout_v2_captcha_request_is_already_in_progress">CAPTCHA request already in progress…</string>
+    <string name="captcha_layout_v2_you_are_requesting_captcha_too_fast">You are requesting CAPTCHAs too fast</string>
     <string name="image_url_copied_to_clipboard">Image URL copied to clipboard</string>
     <string name="delete_site_dialog_title">Delete site?</string>
-    <string name="delete_site_dialog_message">Are you sure you want to delete "%1$s"? This action will delete the site and everything that is associated with it. The app will be restarted. Do you wish to proceed?</string>
+    <string name="delete_site_dialog_message">Really delete "%1$s" (meaning the site and everything associated with it and restart the app)?</string>
 
     <string name="could_not_remove_site_error_message">Could not remove site %1$s (error message: %2$s)</string>
 
-    <string name="reply_comment_empty">Comment body is empty.</string>
+    <string name="reply_comment_empty">Comment body empty.</string>
     <string name="filter_removed_undo">Removed filter %1$s</string>
     <string name="image_url_get_attempt">Getting image from clipboard URL…</string>
-    <string name="image_url_get_failed">Failed to get image from clipboard; %1$s</string>
+    <string name="image_url_get_failed">Could not fetch image from clipboard; %1$s</string>
     <string name="image_url_get_success">Got image from clipboard</string>
     <string name="setting_shift_post">Shift post format</string>
-    <string name="setting_shift_post_description">Shift the comment of long posts to start below the thumbnail</string>
+    <string name="setting_shift_post_description">Move the comment of long posts to start below the thumbnail</string>
     <string name="setting_remove_watched">Remove watched threads from the catalog</string>
 
-    <string name="setting_enable_emoji">Enable emoji</string>
-    <string name="setting_enable_emoji_description">Enable emoji posting and parsing</string>
+    <string name="setting_enable_emoji">Emoji</string>
+    <string name="setting_enable_emoji_description">Allows seeing and pasting smiley graphics</string>
     <string name="experimental_settings_group">Experimental settings</string>
 
     <string name="settings_experimental_settings_title">⚠ EXPERIMENTAL ⚠</string>
-    <string name="settings_experimental_settings_description">These settings may be in an unstable state. They are for testing. They may break the app and you may have to reset the app data. Use them at your own risk if you are really interested in some feature. Backup everything beforehand.</string>
+    <string name="settings_experimental_settings_description">These test settings may be unstable and break the app, resetting all app data. Use at your own risk. Back up everything beforehand.</string>
     <string name="setting_full_screen_rotation">Allow full sensor rotation</string>
     <string name="settings_always_open_drawer">Always open the drawer when a thread is bookmarked</string>
-    <string name="settings_image_long_url">Enable long-press image URL copy</string>
-    <string name="settings_image_long_url_description">Makes long-pressing on post images copy the image URL to the clipboard</string>
-    <string name="setting_embedding_enable">Enable embedding</string>
-    <string name="setting_embedding_enable_description">Replaces certain links with more readable titles, and displays durations if applicable. If post image linking is enabled, some links will generate as images as well.</string>
+    <string name="settings_image_long_url">Long-press to copy image URL</string>
+    <string name="settings_image_long_url_description">Long-pressing post images copies the image URL to the clipboard</string>
+    <string name="setting_embedding_enable">Embedding</string>
+    <string name="setting_embedding_enable_description">Replaces certain links with more readable titles, and displays durations if applicable. If \"Post image linking\" is on, some links are shown as images too.</string>
     <string name="album_download_could_not_save_one_or_more_images">Could not save one or more images</string>
     <string-array name="setting_watch_notify_modes">
         <item>All posts</item>
@@ -646,74 +646,74 @@ Don't have a 4chan Pass?<br>
     <string name="import_or_export_dialog_positive_button_text">Overwrite</string>
     <string name="import_or_export_dialog_negative_button_text">Create new</string>
     <string name="import_or_export_warning">Warning!</string>
-    <string name="import_or_export_warning_super_long_message_part_one">You have %1$s set to be located in a directory that uses the Storage Access Framework. This directory location cannot be exported; IT WILL BE RESET TO DEFAULT in the exported settings file! Once you import them you will have to manually set those locations in Media Settings again.</string>
+    <string name="import_or_export_warning_super_long_message_part_one">You have %1$s set to be located in a directory that uses the \"Storage Access Framework\". This directory location cannot be exported; IT WILL BE RESET TO DEFAULT in the exported settings file! Once you import them you will have to manually set those locations in \"Media Settings\" again.</string>
     <string name="import_or_export_warning_saved_files_base_dir">\"saved files base directory\"</string>
 
-    <string name="media_settings_use_saf_for_save_location_dialog_title">Use the new Storage Access Framework API to choose images download directory?</string>
-    <string name="media_settings_use_saf_for_save_location_dialog_message">If you choose to use the SAF you will be able to choose an SD-card as a place to store downloaded images</string>
+    <string name="media_settings_use_saf_for_save_location_dialog_title">Use the new \"Storage Access Framework API\" to choose where to download images?</string>
+    <string name="media_settings_use_saf_for_save_location_dialog_message">Lets you choose an SD-card to store downloaded images</string>
     <string name="media_settings_use_saf_dialog_positive_button_text">Use SAF API</string>
     <string name="media_settings_use_saf_dialog_negative_button_text">Use old API</string>
     <string name="media_settings_could_not_copy_files">Could not copy one directory\'s file into another one</string>
-    <string name="media_settings_files_copied">Successfully copied files</string>
-    <string name="media_settings_would_you_like_to_delete_file_in_old_dir">Would you like to delete files in the old directory?</string>
-    <string name="media_settings_file_have_been_copied">Files have been copied and now exist in two directories. You may want to remove files in the old directory \n\n\"%1$s\"\n\nsince you won\'t need them anymore. \nThis operation will DELETE ALL the files in that directory, so if you had some files not related to this app you probably should do that manually.</string>
-    <string name="media_settings_could_not_delete_files_in_old_dir">Couldn\'t delete files in the old directory</string>
-    <string name="media_settings_old_files_deleted">Successfully deleted files in the old directory</string>
+    <string name="media_settings_files_copied">All files were copied</string>
+    <string name="media_settings_would_you_like_to_delete_file_in_old_dir">Delete the files in the old directory?</string>
+    <string name="media_settings_file_have_been_copied">The copied files now exist in two places. You can remove them from \n\n\"%1$s.\"\n\n \nThis DELETES ALL files in that directory. If you have files there unrelated to this app you should do so manually.</string>
+    <string name="media_settings_could_not_delete_files_in_old_dir">Could not delete files in the old location</string>
+    <string name="media_settings_old_files_deleted">Deleted all files in the old directory</string>
     <string name="media_settings_copy_files">Copy files</string>
-    <string name="media_settings_do_you_want_to_copy_files">Do you want to copy %1$d files from old directory to the new one?"</string>
-    <string name="media_settings_move_saved_files_to_new_dir">Move old saved files to the new directory?</string>
-    <string name="media_settings_move_saved_files_to_new_dir_description">Move files from \n\n\"%1$s\"\n\n directory to \n\n\"%2$s\"\n\ndirectory? This operation may take quite some time. Once started this operation must not be canceled. \nThis operation will move ALL the files, so if you had some files not related to this app you probably should do that manually.</string>
-    <string name="media_settings_new_saved_files_base_dir_not_registered">New saved files base directory is probably not registered</string>
+    <string name="media_settings_do_you_want_to_copy_files">Copy %1$d files from old location to the new one?"</string>
+    <string name="media_settings_move_saved_files_to_new_dir">Move old saved files to the new location?</string>
+    <string name="media_settings_move_saved_files_to_new_dir_description">Move files from \n\n\"%1$s\"\n\n to \n\n\"%2$s?\"\n\n This may take quite some time and must not be cancelled once started. \nMoves ALL the files, so if you have some files unrelated to this app you should do so manually.</string>
+    <string name="media_settings_new_saved_files_base_dir_not_registered">The base folder for saved files is probably not registered</string>
     <string name="media_settings_no_files_to_copy">No files to copy</string>
-    <string name="media_settings_copying_file">Copying file %1$d out of %2$d</string>
+    <string name="media_settings_copying_file">Copying file %1$d out of %2$d…</string>
     <string name="media_settings_cannot_continue_write_permission">Cannot continue without the WRITE_EXTERNAL_STORAGE permission</string>
-    <string name="media_settings_base_directory_is_already_registered">Cannot use this directory because it is already in use</string>
+    <string name="media_settings_base_directory_is_already_registered">Cannot use this a folder already in use</string>
 
     <string name="add_dubs_title">Add dubs to post cells</string>
     <string name="add_dubs_description">Appends your GET to your post number, for FUN!</string>
     <string name="files_base_dir_does_not_exist"><![CDATA[Base directory for files does not exist! Set it manually in the settings (Media -> Save location)]]></string>
-    <string name="image_saver_could_not_figure_out_save_location">Couldn\'t figure out save location</string>
-    <string name="settings_captcha_setup">Captcha Settings</string>
-    <string name="settings_captcha_setup_description">Captcha settings are per-site configurable. Tap for site setup.</string>
-    <string name="image_saver_canceled_by_user">Canceled by user</string>
+    <string name="image_saver_could_not_figure_out_save_location">Could not figure out where to save this</string>
+    <string name="settings_captcha_setup">CAPTCHA Settings</string>
+    <string name="settings_captcha_setup_description">Tap to set up CAPTCHA settings for each site.</string>
+    <string name="image_saver_canceled_by_user">Cancelled by user</string>
     <string name="image_saver_unknown_location">Unknown location</string>
-    <string name="image_saver_failed_to_save_image">Failed to save the image. Reason: %s</string>
-    <string name="image_saver_no_write_permission">Cannot start saving images without the WRITE_EXTERNAL_STORAGE permission</string>
+    <string name="image_saver_failed_to_save_image">Could not save the image because %s</string>
+    <string name="image_saver_no_write_permission">Grant write permission to external storage to save images</string>
     <string name="media_settings_image_click_preload_strategy_name">Image preload strategy</string>
     <string name="media_settings_image_click_preload_strategy_description">When opening up an image pager, determines what image(s) should be preloaded next.</string>
-    <string name="setting_image_viewer_gestures">Image Viewer gestures</string>
-    <string name="setting_image_viewer_gestures_description">Adds ability to use gestures to close (swipe-up) and save (swipe-bottom) an image/gif/webm when viewing them in gallery</string>
+    <string name="setting_image_viewer_gestures">Image viewer gestures</string>
+    <string name="setting_image_viewer_gestures_description">Allows using gestures to close (swipe-↑) and save (swipe-↓) an image/GIF/WebM in gallery view</string>
 
-    <string name="lorem_ipsum">Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</string>
-    <string name="report_controller_report_an_error_problem">Report an error/crash/other problem</string>
+    <string name="lorem_ipsum">Fearful ubermensch war insofar love horror. Grandeur convictions prejudice snare pinnacle against revaluation spirit. Love love decrepit.</string>
+    <string name="report_controller_report_an_error_problem">Report errors, crashes, and other problems within reason</string>
     <string name="report_controller_i_have_a_problem_with">I have a problem with:</string>
     <string name="report_controller_problem_description">Problem description:</string>
     <string name="report_controller_attach_logs">Attach logs</string>
     <string name="report_controller_no_logs">No logs</string>
     <string name="report_controller_send_report">Send report</string>
-    <string name="report_controller_title_cannot_be_empty_error">Title cannot be empty!</string>
-    <string name="report_controller_description_cannot_be_empty_error">If description is empty, logs cannot be empty!</string>
-    <string name="report_controller_logs_are_empty_error">\"Attach logs\" option is checked, but logs are empty!</string>
-    <string name="report_controller_report_sent">Sent report!</string>
-    <string name="report_controller_error_while_trying_to_send_report">Error while trying to send report: %1$s</string>
+    <string name="report_controller_title_cannot_be_empty_error">Supply a title first.</string>
+    <string name="report_controller_description_cannot_be_empty_error">If the description is empty, you have to supply a log!</string>
+    <string name="report_controller_logs_are_empty_error">You have \"Attach logs\" checked, but no logs attached!</string>
+    <string name="report_controller_report_sent">Report sent.</string>
+    <string name="report_controller_error_while_trying_to_send_report">Could not send report: %1$s</string>
 
     <string name="hsid_cookie_text">HSID</string>
     <string name="ssid_cookie_text">SSID</string>
     <string name="sid_cookie_text">SID</string>
     <string name="nid_cookie_text">NID</string>
     <string name="js_captcha_cookies_editor_format_hint">Do not prepend values with \"HSID=…\", \"SSID=…\" etc.</string>
-    <string name="settings_js_captcha_cookies_title">JS captcha cookies</string>
-    <string name="settings_js_captcha_cookies_description">By inputting your desktop browser captcha cookies, captcha solving may become easier</string>
-    <string name="cookies_editor_bad_cookie">%1$s cookie is not set!</string>
-    <string name="cookies_editor_failed_parse">Failed to parse cookies, re-enter them correctly!</string>
+    <string name="settings_js_captcha_cookies_title">JavaScript CAPTCHA cookies</string>
+    <string name="settings_js_captcha_cookies_description">By inputting your desktop browser CAPTCHA cookies, CAPTCHA solving may become easier</string>
+    <string name="cookies_editor_bad_cookie">%1$s cookie not set!</string>
+    <string name="cookies_editor_failed_parse">Could not parse cookies, re-enter them correctly.</string>
 
     <string name="settings_report">Report</string>
     <string name="settings_report_description">Report a problem/crash</string>
     <string name="settings_collect_crash_logs">Collect crash logs</string>
-    <string name="settings_collect_crash_logs_description">By enabling this setting, the app will start collecting crash logs. They are NOT uploaded automatically. Crash logs only collect the stacktrace itself, app version and basic OS information. You can review and upload them manually (or delete) by clicking the \"Report\" setting.</string>
+    <string name="settings_collect_crash_logs_description">Starts collecting app-crash logs (stacktrace, app version and basic OS info), to be reviewed and sent (from \"Report\") if you wish to do so.</string>
     <string name="review_crashlogs_controller_title">Review crash logs</string>
-    <string name="settings_report_suggest_sending_logs_title">You have %1$d collected crash logs</string>
-    <string name="settings_report_suggest_sending_logs">Would you like to review and maybe send them to developers?</string>
+    <string name="settings_report_suggest_sending_logs_title">%1$d crash logs collected</string>
+    <string name="settings_report_suggest_sending_logs">Review and maybe send them to the developers?</string>
     <string name="settings_report_review_button_text">Review crash logs</string>
     <string name="settings_report_review_later_button_text">Review later</string>
     <string name="settings_report_delete_all_crash_logs">Delete all crash logs</string>
@@ -721,51 +721,51 @@ Don't have a 4chan Pass?<br>
     <string name="sent_n_crashlogs">Sent %1$d crash log(s)</string>
 
     <string name="media_settings_base_dir_reset">Base directory reset to default</string>
-    <string name="media_settings_could_not_create_default_baseDir">Could not create default base dir: %1$s</string>
+    <string name="media_settings_could_not_create_default_baseDir">Could not create default base directory because %1$s</string>
 
-    <string name="site_uses_dynamic_boards">"Unable to go to board (site likely has dynamic boards). Add the board using the boards menu first."</string>
-    <string name="could_not_start_saving_no_permissions">Could not start downloading images, no WRITE_ACCESS permission was granted</string>
-    <string name="update_manager_copy_apk_title">Copy apk?</string>
-    <string name="update_manager_copy_apk">Would you like to store this apk?</string>
-    <string name="update_manager_could_not_convert_uri">Couldn\'t convert uri (%1$s) into an ExternalFile</string>
-    <string name="update_manager_input_file_does_not_exist">Input apk file (%1$s) does not exist</string>
+    <string name="site_uses_dynamic_boards">"Since the site likely has dynamic boards you must add one from the \"Boards\" menu first."</string>
+    <string name="could_not_start_saving_no_permissions">Grant write access permission to start downloading images</string>
+    <string name="update_manager_copy_apk_title">Copy APK?</string>
+    <string name="update_manager_copy_apk">Would you like to store this APK?</string>
+    <string name="update_manager_could_not_convert_uri">Could not convert URI (%1$s) into an ExternalFile</string>
+    <string name="update_manager_input_file_does_not_exist">Input APK file (%1$s) does not exist</string>
     <string name="update_manager_output_file_does_not_exist">Output file (%1$s) does not exist</string>
-    <string name="update_manager_could_not_copy_apk">Couldn\'t copy file contents from file (%1$s) into (%2$s)</string>
-    <string name="update_manager_apk_copied">Apk successfully copied</string>
-    <string name="settings_show_copy_apk_dialog_title">Show copy apk dialog when downloading an update</string>
-    <string name="settings_show_copy_apk_dialog">Every time you download a new update a dialog with suggestion to copy that apk to some other directory will be shown</string>
+    <string name="update_manager_could_not_copy_apk">Could not copy file contents from file (%1$s) into (%2$s)</string>
+    <string name="update_manager_apk_copied">APK copied</string>
+    <string name="settings_show_copy_apk_dialog_title">Show \"copy APK\" dialog when downloading an update</string>
+    <string name="settings_show_copy_apk_dialog">Every time you download a new update a dialog with suggestion to copy that APK to some other directory will be shown</string>
 
-    <string name="could_not_initialized_captcha">Couldn\'t initialize captcha, reason: %1$s</string>
+    <string name="could_not_initialized_captcha">Could not initialize CAPTCHA because %1$s</string>
     <string name="fail_reason_webview_is_not_installed">WebView is not installed</string>
-    <string name="fail_reason_some_part_of_webview_not_initialized">Some part of WebViewChromium couldn\'t get initialized: (%1$s)</string>
+    <string name="fail_reason_some_part_of_webview_not_initialized">Could not start some part of WebViewChromium because %1$s</string>
 
-    <string name="setting_enable_image_link_loading">Enable image link loading</string>
-    <string name="setting_enable_image_link_loading_description">Adds any JPG, PNG, GIF, WEBM, MP4, PDF, BMP, WEBP, MP3, SWF, M4A, OGG, or FLAC files linked in posts as internally viewable post attachments with a special spoiler image.</string>
+    <string name="setting_enable_image_link_loading">Image link loading</string>
+    <string name="setting_enable_image_link_loading_description">Adds any JPG, PNG, GIF, WebM, MP4, PDF, BMP, WEBP, MP3, SWF, M4A, OGG, or FLAC files linked in posts as internally viewable post attachments with a special spoiler image.</string>
     <string name="add_new_zone">Add new zone</string>
-    <string name="setting_exclusion_zones_left_zone_portrait">Left zone (Portrait orientation)</string>
-    <string name="setting_exclusion_zones_right_zone_portrait">Right zone (Portrait orientation)</string>
-    <string name="setting_exclusion_zones_left_zone_landscape">Left zone (Landscape orientation)</string>
-    <string name="setting_exclusion_zones_right_zone_landscape">Right zone (Landscape orientation)</string>
+    <string name="setting_exclusion_zones_left_zone_portrait">← zone (▯)</string>
+    <string name="setting_exclusion_zones_right_zone_portrait">→ zone (▯)</string>
+    <string name="setting_exclusion_zones_left_zone_landscape">← zone (▭)</string>
+    <string name="setting_exclusion_zones_right_zone_landscape">→ zone (▭)</string>
     <string name="setting_exclusion_zones_reset_zones">Reset exclusion zones</string>
-    <string name="setting_exclusion_zones_reset_zones_description">All exclusion zones will be deleted; the app will be restarted</string>
-    <string name="setting_exclusion_zones_editor">Android 10 gesture exclusion zones</string>
-    <string name="setting_exclusion_zones_editor_description">Adjust zones where Android 10 gestures will be disabled. \n\nYou will have to rotate your phone/tablet to set zones for different orientations. \nYou will have to restart the app for the changes to be applied!</string>
+    <string name="setting_exclusion_zones_reset_zones_description">All exclusion zones will be deleted and the app restarted</string>
+    <string name="setting_exclusion_zones_editor">Android 10 gesture-exclusion zones</string>
+    <string name="setting_exclusion_zones_editor_description">Adjust zones to turn off Android 10 gestures. \n\nRotate your device to set zones for different orientations. \nRestart the app to use changes.</string>
     <string name="setting_exclusion_zones_actions_dialog_title">Android 10 exclusion zones actions</string>
-    <string name="setting_exclusion_zones_wrong_phone_orientation">Wrong phone orientation, you need to rotate your phone 90 degrees to any side before using this option.</string>
+    <string name="setting_exclusion_zones_wrong_phone_orientation">Wrong phone orientation. Rotate your device 90° to any side before using this option.</string>
     <string name="setting_exclusion_zones_edit_or_remove_zone_title">Edit or remove zone?</string>
     <string name="setting_exclusion_zones_zone_removed">Zone removed. Restart the app for the changes to kick in.</string>
-    <string name="setting_exclusion_zones_zone_added">New exclusion zone added. Restart the app for the changes to kick in.</string>
+    <string name="setting_exclusion_zones_zone_added">New exclusion zone added. Restart the app to use changes.</string>
 
     <string name="setting_allow_okhttp_http2">Allow OkHttp to use HTTP/2 protocol</string>
     <string name="setting_allow_okhttp_ipv6">Allow OkHttp to use IPv6</string>
-    <string name="setting_allow_okhttp_http2_ipv6_description">Disabling this setting may resolve issues with images not loading whatsoever in some rare cases. Try disabling this setting if images refuse to start loading.</string>
+    <string name="setting_allow_okhttp_http2_ipv6_description">Try turning this off if images refuse to load.</string>
 
     <string name="file_has_orientation_exif_data">This file has orientation data. Consider re-encoding it before posting.</string>
     <string name="file_type_may_not_be_supported">This file may not be supported on this imageboard. Consider re-encoding it before posting.</string>
     <string name="file_cannot_be_reencoded">Image doesn\'t support re-encoding.</string>
 
     <string name="view_my_posts">View my posts</string>
-    <string name="no_saved_posts_for_current_thread">You haven\'t posted in this thread!</string>
+    <string name="no_saved_posts_for_current_thread">None of the posts in this thread are yours.</string>
 
     <string name="linkable_copied_to_clipboard">Linkable URL copied to clipboard</string>
 
@@ -773,18 +773,18 @@ Don't have a 4chan Pass?<br>
     <string name="options_button_pass">Since4Pass</string>
     <string name="options_button_fortune">Fortune</string>
 
-    <string name="apply_image_filter_to_post">Apply image hash filters to posts</string>
-    <string name="apply_image_filter_to_post_description">Applies image hash filtering to posts themselves as opposed to images</string>
-    <string name="yt_api_key_dialog">Youtube API Key</string>
-    <string name="yt_api_key_dialog_description">Without a key parsing is still possible, but may not be reliable. You can use your own key, or snag the one from 4chanX.</string>
+    <string name="apply_image_filter_to_post">Image hash filtering of posts</string>
+    <string name="apply_image_filter_to_post_description">Image hash filtering for posts, as opposed to images</string>
+    <string name="yt_api_key_dialog">YouTube API Key</string>
+    <string name="yt_api_key_dialog_description">Without a key, parsing is still possible, but may not be reliable. You can use your own key, or get the one from 4chan X.</string>
 
-    <string name="clear_history">Long press to clear all history!</string>
+    <string name="clear_history">Long-press to clear all history.</string>
     <string name="no_history">No history available.</string>
 
     <string name="filter_add_hint">Add a filter</string>
     <string name="filter_toggle_hint">Toggle all filters on/off</string>
     <string name="album_download_hint">Download multiple images</string>
 
-    <string name="reply_filename_hint">Tap to randomize filename</string>
+    <string name="reply_filename_hint">Tap to randomise filename</string>
     <string name="reply_spoiler_hint">Toggle if posting as a spoiler</string>
 </resources>
