@@ -103,11 +103,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="update_install_download_failed">Download failed</string>
     <string name="update_install_download_failed_description">Reason: %1$s</string>
     <string name="update_retry_title">Retry update</string>
-    <string name="update_retry">%1$s not updated yet. Tap \"retry\" to retry the install.</string>
+    <string name="update_retry">%1$s not updated yet. Tap \"Retry\" to retry the install.</string>
     <string name="update_retry_button">Retry</string>
     <string name="update_storage_permission_required_title">Storage permission required</string>
     <string name="update_storage_permission_required">
-"Grant access storage permission to install the update.
+"Grant storage access permission to install the update.
 
 Re-enable this permission in the app settings if you permanently disabled it."</string>
 
@@ -146,7 +146,7 @@ Re-enable this permission in the app settings if you permanently disabled it."</
     <string name="open_thread_confirmation">Open this thread?</string>
     <string name="open_archived_thread_confirmation">Open this archived thread?</string>
     <string name="open_link_failed">Install an app that can open this link first</string>
-    <string name="open_file_picker_failed">Install a file picker app first</string>
+    <string name="open_file_picker_failed">Install a file-picker app first</string>
     <string name="image_pick_delegate_select_file_picker">Select a file picker to open a file…</string>
 
     <string name="thumbnail_load_failed_network">Error</string>
@@ -254,7 +254,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     6) Comment<br>
     7) ID<br>
     8) Subject<br>
-    9) Country Code<br>
+    9) Country code<br>
     10) Filename<br>
 </p>
 ]]>
@@ -398,7 +398,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_watch_peek">Heads-up notification on quotes</string>
     <string name="setting_watch_peek_description">Show a heads-up notification when quoted</string>
     <string name="settings_group_about">About</string>
-    <string name="settings_about_license">Copyelfted libre software, licensed GPLv3</string>
+    <string name="settings_about_license">Copyelfted libre software, licensed GPLv3+</string>
 
     <!-- Main About group -->
     <string name="settings_about_license_description">Tap to show license</string>
@@ -439,7 +439,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
 
     <!-- Appearance gallery group -->
     <string name="setting_hide_images">On-demand images</string>
-    <string name="setting_hide_images_description">Special spoiler intead of images. Saves data.</string>
+    <string name="setting_hide_images_description">Special spoiler instead of images. Saves data.</string>
     <string name="setting_images_immersive_mode_title">Immersive mode for image gallery</string>
     <string name="setting_images_immersive_mode_description">Fullscreen gallery view with statusbar/navbar hidden</string>
     <string name="settings_screen_behavior">Behavior</string>
@@ -491,7 +491,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_save_album_thread_folder">Save albums in thread folders</string>
     <string name="setting_save_album_thread_folder_description">One folder for each thread to save image albums in</string>
     <string name="setting_save_server_filename">Save server filename</string>
-    <string name="setting_save_server_filename_description">Give saved filenams the name the site assigned. Otherwise the filename the uploader assigned is used.</string>
+    <string name="setting_save_server_filename_description">Give saved filenames the name the site assigned. Otherwise the filename the uploader assigned is used.</string>
     <string name="setting_video_default_muted">Start videos muted</string>
     <string name="setting_video_stream">Stream videos</string>
     <string name="setting_video_stream_description">Attempt to stream videos, instead of downloading them completely. (Works really badly on 4chan servers)</string>
@@ -518,7 +518,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_video_auto_loop">Automatic video-looping</string>
     <string name="setting_video_auto_loop_description">Start videos from the beginning once finished</string>
     <string name="setting_auto_load_thread_images">Media pre-fetching</string>
-    <string name="setting_auto_load_thread_images_description">Pre-loads fullsize images to show as thumbnails. Tapping thumbnails loads fullsize the pre-fetched image directly.</string>
+    <string name="setting_auto_load_thread_images_description">Pre-loads fullsize images to show as thumbnails. Tapping thumbnails loads the fullsize pre-fetched image directly.</string>
     <string name="save_location_screen">Save location</string>
     <string name="save_location_storage_permission_required_title">Storage permission required</string>
     <string name="save_location_storage_permission_required">
@@ -533,7 +533,7 @@ Re-enable this permission in the app settings if you permanently disabled it."
     <string name="new_folder_hint">Folder name</string>
     <string name="setting_theme_explanation">
 "← → to change theme.
-Tap the toolbar menu to change colour.
+Tap the toolbar menu to change color.
 Tap ✓ once done.
 
 On Android 10+, clicking the 🌣/☾ selects the theme used for the day or night theme if dark mode is on.
@@ -666,7 +666,7 @@ Don't have a 4chan Pass?<br>
     <string name="media_settings_new_saved_files_base_dir_not_registered">The base folder for saved files is probably not registered</string>
     <string name="media_settings_no_files_to_copy">No files to copy</string>
     <string name="media_settings_copying_file">Copying file %1$d out of %2$d…</string>
-    <string name="media_settings_cannot_continue_write_permission">Cannot continue without the WRITE_EXTERNAL_STORAGE permission</string>
+    <string name="media_settings_cannot_continue_write_permission">Grant the permission to write to external storage first</string>
     <string name="media_settings_base_directory_is_already_registered">Cannot use this a folder already in use</string>
 
     <string name="add_dubs_title">Add dubs to post cells</string>
@@ -703,7 +703,7 @@ Don't have a 4chan Pass?<br>
     <string name="nid_cookie_text">NID</string>
     <string name="js_captcha_cookies_editor_format_hint">Do not prepend values with \"HSID=…\", \"SSID=…\" etc.</string>
     <string name="settings_js_captcha_cookies_title">JavaScript CAPTCHA cookies</string>
-    <string name="settings_js_captcha_cookies_description">By inputting your desktop browser CAPTCHA cookies, CAPTCHA solving may become easier</string>
+    <string name="settings_js_captcha_cookies_description">By inputting CAPTCHA cookies from your desktop web browser, solving CAPTCHAs may become easier</string>
     <string name="cookies_editor_bad_cookie">%1$s cookie not set!</string>
     <string name="cookies_editor_failed_parse">Could not parse cookies, re-enter them correctly.</string>
 
@@ -735,12 +735,12 @@ Don't have a 4chan Pass?<br>
     <string name="settings_show_copy_apk_dialog_title">Show \"copy APK\" dialog when downloading an update</string>
     <string name="settings_show_copy_apk_dialog">Every time you download a new update a dialog with suggestion to copy that APK to some other directory will be shown</string>
 
-    <string name="could_not_initialized_captcha">Could not initialize CAPTCHA because %1$s</string>
+    <string name="could_not_initialized_captcha">Could not present CAPTCHA because %1$s</string>
     <string name="fail_reason_webview_is_not_installed">WebView is not installed</string>
     <string name="fail_reason_some_part_of_webview_not_initialized">Could not start some part of WebViewChromium because %1$s</string>
 
     <string name="setting_enable_image_link_loading">Image link loading</string>
-    <string name="setting_enable_image_link_loading_description">Adds any JPG, PNG, GIF, WebM, MP4, PDF, BMP, WEBP, MP3, SWF, M4A, OGG, or FLAC files linked in posts as internally viewable post attachments with a special spoiler image.</string>
+    <string name="setting_enable_image_link_loading_description">Adds any JPG, PNG, GIF, WebM, MP4, PDF, BMP, WebP, MP3, SWF, M4A, OGG, or FLAC files linked in posts as internally viewable post attachments with a special spoiler image.</string>
     <string name="add_new_zone">Add new zone</string>
     <string name="setting_exclusion_zones_left_zone_portrait">← zone (▯)</string>
     <string name="setting_exclusion_zones_right_zone_portrait">→ zone (▯)</string>
@@ -785,6 +785,6 @@ Don't have a 4chan Pass?<br>
     <string name="filter_toggle_hint">Toggle all filters on/off</string>
     <string name="album_download_hint">Download multiple images</string>
 
-    <string name="reply_filename_hint">Tap to randomise filename</string>
+    <string name="reply_filename_hint">Tap to randomize filename</string>
     <string name="reply_spoiler_hint">Toggle if posting as a spoiler</string>
 </resources>
