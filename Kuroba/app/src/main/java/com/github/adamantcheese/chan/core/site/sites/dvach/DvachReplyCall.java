@@ -18,15 +18,19 @@ package com.github.adamantcheese.chan.core.site.sites.dvach;
 
 import android.text.TextUtils;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
+import com.github.adamantcheese.chan.core.net.ProgressRequestBody;
 import com.github.adamantcheese.chan.core.site.common.CommonReplyHttpCall;
-import com.github.adamantcheese.chan.core.site.http.ProgressRequestBody;
 import com.github.adamantcheese.chan.core.site.http.Reply;
+import com.github.adamantcheese.chan.core.site.http.ReplyResponse;
 
 import org.jsoup.Jsoup;
 
+import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,37 +46,37 @@ public class DvachReplyCall
     private static final Pattern THREAD_MESSAGE =
             Pattern.compile("^\\{\"Error\":null,\"Status\":\"Redirect\",\"Target\":(\\d+)");
 
-    DvachReplyCall(Loadable loadable) {
-        super(loadable);
+    DvachReplyCall(@NonNull NetUtilsClasses.ResponseResult<ReplyResponse> callback, Loadable loadable) {
+        super(callback, loadable);
     }
 
     @Override
     public void addParameters(
             MultipartBody.Builder formBuilder, @Nullable ProgressRequestBody.ProgressRequestListener progressListener
     ) {
-        Reply reply = replyResponse.originatingLoadable.draft;
+        Reply reply = originatingLoadable.draft;
 
         formBuilder.addFormDataPart("task", "post");
-        formBuilder.addFormDataPart("board", replyResponse.originatingLoadable.boardCode);
+        formBuilder.addFormDataPart("board", originatingLoadable.boardCode);
         formBuilder.addFormDataPart("comment", reply.comment);
-        formBuilder.addFormDataPart("thread", String.valueOf(replyResponse.originatingLoadable.no));
+        formBuilder.addFormDataPart("thread", String.valueOf(originatingLoadable.no));
 
         formBuilder.addFormDataPart("name", reply.name);
         formBuilder.addFormDataPart("email", reply.options);
 
-        if (!replyResponse.originatingLoadable.isThreadMode() && !TextUtils.isEmpty(reply.subject)) {
+        if (!originatingLoadable.isThreadMode() && !TextUtils.isEmpty(reply.subject)) {
             formBuilder.addFormDataPart("subject", reply.subject);
         }
 
-        if (reply.captchaResponse != null) {
+        if (reply.token != null && reply.token.token != null) {
             formBuilder.addFormDataPart("captcha_type", "recaptcha");
             formBuilder.addFormDataPart("captcha_key", Dvach.CAPTCHA_KEY);
 
-            if (reply.captchaChallenge != null) {
-                formBuilder.addFormDataPart("recaptcha_challenge_field", reply.captchaChallenge);
-                formBuilder.addFormDataPart("recaptcha_response_field", reply.captchaResponse);
+            if (reply.token.challenge != null) {
+                formBuilder.addFormDataPart("recaptcha_challenge_field", reply.token.challenge);
+                formBuilder.addFormDataPart("recaptcha_response_field", reply.token.token);
             } else {
-                formBuilder.addFormDataPart("g-recaptcha-response", reply.captchaResponse);
+                formBuilder.addFormDataPart("g-recaptcha-response", reply.token.token);
             }
         }
 
@@ -87,33 +91,33 @@ public class DvachReplyCall
         RequestBody requestBody;
 
         if (progressListener == null) {
-            requestBody = RequestBody.create(replyResponse.originatingLoadable.draft.file,
-                    MediaType.parse("application/octet-stream")
-            );
+            requestBody =
+                    RequestBody.create(originatingLoadable.draft.file, MediaType.parse("application/octet-stream"));
         } else {
             requestBody = new ProgressRequestBody(
-                    RequestBody.create(replyResponse.originatingLoadable.draft.file,
-                            MediaType.parse("application/octet-stream")
-                    ),
+                    RequestBody.create(originatingLoadable.draft.file, MediaType.parse("application/octet-stream")),
                     progressListener
             );
         }
 
-        formBuilder.addFormDataPart("image", replyResponse.originatingLoadable.draft.fileName, requestBody);
+        formBuilder.addFormDataPart("image", originatingLoadable.draft.fileName, requestBody);
     }
 
     @Override
-    public void process(Response response, String result) {
-        Matcher errorMessageMatcher = ERROR_MESSAGE.matcher(result);
+    public ReplyResponse convert(Response response)
+            throws IOException {
+        ReplyResponse replyResponse = new ReplyResponse(originatingLoadable);
+        String responseString = response.body().string();
+        Matcher errorMessageMatcher = ERROR_MESSAGE.matcher(responseString);
         if (errorMessageMatcher.find()) {
             replyResponse.errorMessage = Jsoup.parse(errorMessageMatcher.group(1)).body().text();
         } else {
             replyResponse.posted = true;
-            Matcher postMessageMatcher = POST_MESSAGE.matcher(result);
+            Matcher postMessageMatcher = POST_MESSAGE.matcher(responseString);
             if (postMessageMatcher.find()) {
                 replyResponse.postNo = Integer.parseInt(postMessageMatcher.group(1));
             } else {
-                Matcher threadMessageMatcher = THREAD_MESSAGE.matcher(result);
+                Matcher threadMessageMatcher = THREAD_MESSAGE.matcher(responseString);
                 if (threadMessageMatcher.find()) {
                     int threadNo = Integer.parseInt(threadMessageMatcher.group(1));
                     replyResponse.threadNo = threadNo;
@@ -121,5 +125,6 @@ public class DvachReplyCall
                 }
             }
         }
+        return replyResponse;
     }
 }

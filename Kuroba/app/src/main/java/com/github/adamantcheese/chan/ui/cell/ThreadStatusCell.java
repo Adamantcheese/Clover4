@@ -22,29 +22,34 @@ import android.os.Handler;
 import android.text.SpannableStringBuilder;
 import android.util.AttributeSet;
 import android.view.View;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.core.model.ChanThread;
+import com.github.adamantcheese.chan.core.model.Post;
+import com.github.adamantcheese.chan.core.model.orm.Board;
+import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.ui.theme.ThemeHelper;
 
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
+
+@SuppressLint("AppCompatCustomView")
 public class ThreadStatusCell
-        extends LinearLayout
+        extends TextView
         implements View.OnClickListener {
     private static final int UPDATE_INTERVAL = 1000;
     private static final int MESSAGE_INVALIDATE = 1;
-    public static final String SPECIAL = "__SPECIAL__";
 
     private Callback callback;
 
     private boolean running = false;
 
-    private TextView text;
     private String error;
     private final Handler handler = new Handler(msg -> {
         if (msg.what == MESSAGE_INVALIDATE) {
@@ -65,10 +70,41 @@ public class ThreadStatusCell
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        if (isInEditMode()) return;
 
-        text = findViewById(R.id.text);
-        text.setTypeface(ThemeHelper.getTheme().mainFont);
+        if (!isInEditMode()) {
+            setTypeface(ThemeHelper.getTheme().mainFont);
+        } else {
+            setCallback(new Callback() {
+                @Override
+                public long getTimeUntilLoadMore() {
+                    return SECONDS.toMillis(20);
+                }
+
+                @Override
+                public boolean isWatching() {
+                    return true;
+                }
+
+                @Override
+                public ChanThread getChanThread() {
+                    List<Post> testPosts = new ArrayList<>();
+                    testPosts.add(new Post.Builder().board(Board.getDummyBoard())
+                            .no(1)
+                            .opId(1)
+                            .replies(1)
+                            .images(1)
+                            .uniqueIps(1)
+                            .setUnixTimestampSeconds(System.currentTimeMillis())
+                            .comment("")
+                            .build());
+                    return new ChanThread(Loadable.emptyLoadable(), testPosts);
+                }
+
+                @Override
+                public void onListStatusClicked() {}
+            });
+            update();
+        }
 
         setOnClickListener(this);
     }
@@ -79,21 +115,16 @@ public class ThreadStatusCell
 
     public void setError(String error) {
         this.error = error;
+        update();
         if (error == null) {
             schedule();
-        } else {
-            update();
         }
     }
 
     @SuppressLint("SetTextI18n")
     public boolean update() {
         if (error != null) {
-            if (error.startsWith(SPECIAL)) {
-                text.setText(error.substring(SPECIAL.length()));
-            } else {
-                text.setText(error + "\n" + getString(R.string.thread_refresh_bar_inactive));
-            }
+            setText(error + "\n" + getContext().getString(R.string.thread_refresh_bar_inactive));
             return false;
         } else {
             ChanThread chanThread = callback.getChanThread();
@@ -108,25 +139,25 @@ public class ThreadStatusCell
             SpannableStringBuilder builder = new SpannableStringBuilder();
 
             if (chanThread.isArchived()) {
-                builder.append(getString(R.string.thread_archived));
+                builder.append(getContext().getString(R.string.thread_archived));
             } else if (chanThread.isClosed()) {
-                builder.append(getString(R.string.thread_closed));
+                builder.append(getContext().getString(R.string.thread_closed));
             }
 
             if (!chanThread.isArchived() && !chanThread.isClosed()) {
                 long time = callback.getTimeUntilLoadMore() / 1000L;
                 if (!callback.isWatching()) {
-                    builder.append(getString(R.string.thread_refresh_bar_inactive));
+                    builder.append(getContext().getString(R.string.thread_refresh_bar_inactive));
                 } else if (time <= 0) {
-                    builder.append(getString(R.string.loading));
+                    builder.append(getContext().getString(R.string.loading));
                 } else {
-                    builder.append(getString(R.string.thread_refresh_countdown, time));
+                    builder.append(getContext().getString(R.string.thread_refresh_countdown, time));
                 }
                 update = true;
             }
 
             builder.append('\n').append(chanThread.summarize(false));
-            text.setText(builder);
+            setText(builder);
 
             return update;
         }
@@ -170,15 +201,8 @@ public class ThreadStatusCell
 
     @Override
     public void onClick(View v) {
-        if (error != null && error.startsWith(SPECIAL)) {
-            callback.onListStatusClicked();
-            return;
-        }
-        error = null;
-        if (callback.getChanThread() != null) {
-            callback.onListStatusClicked();
-        }
-        update();
+        callback.onListStatusClicked();
+        setError(null);
     }
 
     public interface Callback {

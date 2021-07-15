@@ -44,17 +44,22 @@ import com.j256.ormlite.stmt.Where;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
 
+import java.io.ByteArrayOutputStream;
+import java.io.ObjectOutputStream;
 import java.lang.reflect.Constructor;
 import java.sql.SQLException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import okio.ByteString;
 
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppContext;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getPreferences;
@@ -64,7 +69,7 @@ public class DatabaseHelper
     private static final String TAG = "DatabaseHelper";
 
     private static final String DATABASE_NAME = "ChanDB";
-    private static final int DATABASE_VERSION = 52;
+    private static final int DATABASE_VERSION = 54;
 
     // All of these are NOT instantiated in the constructor because it is possible that they are failed to be created before an upgrade
     // Therefore they are instantiated upon request instead; this doesn't guarantee a lack of exceptions however
@@ -554,6 +559,30 @@ public class DatabaseHelper
                 database.execSQL("DROP TABLE saved_thread");
             } catch (Exception e) {
                 Logger.e(this, "Error upgrading to version 52");
+            }
+        }
+
+        if (oldVersion < 53) {
+            try {
+                // add forced anon field to board
+                getBoardDao().executeRawNoArgs("ALTER TABLE board ADD COLUMN forcedAnon INTEGER default 0");
+            } catch (Exception e) {
+                Logger.e(this, "Error upgrading to version 53");
+            }
+        }
+
+        if (oldVersion < 54) {
+            try {
+                ByteArrayOutputStream stream = new ByteArrayOutputStream();
+                ObjectOutputStream stream1 = new ObjectOutputStream(stream);
+                stream1.writeObject(new HashMap<String, String>());
+                stream1.close();
+                ByteString out = ByteString.of(stream.toByteArray());
+                stream.close();
+                getBoardDao().executeRawNoArgs(
+                        "ALTER TABLE board ADD COLUMN boardFlags BLOB NOT NULL default x'" + out.hex() + "'");
+            } catch (Exception e) {
+                Logger.e(this, "Error upgrading to version 54", e);
             }
         }
     }

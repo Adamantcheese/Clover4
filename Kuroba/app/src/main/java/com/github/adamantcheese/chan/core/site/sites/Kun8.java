@@ -1,9 +1,8 @@
 package com.github.adamantcheese.chan.core.site.sites;
 
-import androidx.annotation.NonNull;
-
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
 import com.github.adamantcheese.chan.core.site.SiteAuthentication;
 import com.github.adamantcheese.chan.core.site.SiteIcon;
 import com.github.adamantcheese.chan.core.site.common.CommonSite;
@@ -12,6 +11,7 @@ import com.github.adamantcheese.chan.core.site.common.vichan.VichanActions;
 import com.github.adamantcheese.chan.core.site.common.vichan.VichanApi;
 import com.github.adamantcheese.chan.core.site.common.vichan.VichanCommentParser;
 import com.github.adamantcheese.chan.core.site.common.vichan.VichanEndpoints;
+import com.github.adamantcheese.chan.core.site.http.ReplyResponse;
 
 import java.util.Map;
 
@@ -72,10 +72,19 @@ public class Kun8
         });
 
         setEndpoints(new VichanEndpoints(this, "https://8kun.top", "https://sys.8kun.top") {
+
+            //8kun changed directory structures after this date (8/25/2016), so we need to switch off that to make it work
+            private final long IMAGE_CHANGE_DATE = 1472083200L;
+
             @Override
             public HttpUrl imageUrl(Post.Builder post, Map<String, String> arg) {
-                return HttpUrl.parse(
-                        "https://media.8kun.top/" + "file_store/" + (arg.get("tim") + "." + arg.get("ext")));
+                if (post.unixTimestampSeconds > IMAGE_CHANGE_DATE) {
+                    return HttpUrl.parse(
+                            "https://media.8kun.top/" + "file_store/" + arg.get("tim") + "." + arg.get("ext"));
+                } else {
+                    return HttpUrl.parse("https://media.8kun.top/" + post.board.code + "/src/" + arg.get("tim") + "."
+                            + arg.get("ext"));
+                }
             }
 
             @Override
@@ -93,14 +102,21 @@ public class Kun8
                         break;
                 }
 
-                return HttpUrl.parse(
-                        "https://media.8kun.top/" + "file_store/" + "thumb/" + (arg.get("tim") + "." + ext));
+                if (post.unixTimestampSeconds > IMAGE_CHANGE_DATE) {
+                    return HttpUrl.parse(
+                            "https://media.8kun.top/" + "file_store/" + "thumb/" + arg.get("tim") + "." + ext);
+                } else {
+                    // this is imperfect, for some reason some thumbnails are png and others are jpg randomly
+                    // kinda mucks up the image viewing as well
+                    return HttpUrl.parse(
+                            "https://media.8kun.top/" + post.board.code + "/thumb/" + arg.get("tim") + "." + ext);
+                }
             }
         });
 
         setActions(new VichanActions(this) {
             @Override
-            public void setupPost(Loadable loadable, MultipartHttpCall call) {
+            public void setupPost(Loadable loadable, MultipartHttpCall<ReplyResponse> call) {
                 super.setupPost(loadable, call);
 
                 if (loadable.isThreadMode()) {
@@ -113,13 +129,17 @@ public class Kun8
             }
 
             @Override
-            public boolean requirePrepare() {
-                // We don't need to check the antispam fields for 8chan.
-                return false;
+            public void prepare(
+                    MultipartHttpCall<ReplyResponse> call,
+                    Loadable loadable,
+                    NetUtilsClasses.ResponseResult<Void> callback
+            ) {
+                // don't need to check antispam for this site
+                callback.onSuccess(null);
             }
 
             @Override
-            public SiteAuthentication postAuthenticate() {
+            public SiteAuthentication postAuthenticate(Loadable loadableWithDraft) {
                 return SiteAuthentication.fromUrl(
                         "https://sys.8kun.top/dnsbls_bypass.php",
                         "You failed the CAPTCHA",
@@ -130,11 +150,5 @@ public class Kun8
 
         setApi(new VichanApi(this));
         setParser(new VichanCommentParser());
-    }
-
-    @NonNull
-    @Override
-    public ChunkDownloaderSiteProperties getChunkDownloaderSiteProperties() {
-        return new ChunkDownloaderSiteProperties(Integer.MAX_VALUE, true);
     }
 }

@@ -150,32 +150,32 @@ public class MediaSettingsController
             SettingsGroup media = new SettingsGroup(R.string.settings_group_saving);
 
             //Save locations
-            saveLocation = (LinkSettingView) media.add(new LinkSettingView(this,
+            saveLocation = media.add(new LinkSettingView(this,
                     getString(R.string.save_location_screen),
                     saveLocationSetupDelegate.getSaveLocation(),
-                    v -> saveLocationSetupDelegate.showUseSAFOrOldAPIForSaveLocationDialog()
+                    (v, sv) -> saveLocationSetupDelegate.showUseSAFOrOldAPIForSaveLocationDialog()
             ));
 
             //Save modifications
-            imageBoardFolderSetting = (BooleanSettingView) media.add(new BooleanSettingView(this,
+            imageBoardFolderSetting = media.add(new BooleanSettingView(this,
                     ChanSettings.saveImageBoardFolder,
                     R.string.setting_save_image_board_folder,
                     R.string.setting_save_image_board_folder_description
             ));
 
-            imageThreadFolderSetting = (BooleanSettingView) media.add(new BooleanSettingView(this,
+            imageThreadFolderSetting = media.add(new BooleanSettingView(this,
                     ChanSettings.saveImageThreadFolder,
                     R.string.setting_save_image_thread_folder,
                     R.string.setting_save_image_thread_folder_description
             ));
 
-            albumBoardFolderSetting = (BooleanSettingView) media.add(new BooleanSettingView(this,
+            albumBoardFolderSetting = media.add(new BooleanSettingView(this,
                     ChanSettings.saveAlbumBoardFolder,
                     R.string.setting_save_album_board_folder,
                     R.string.setting_save_album_board_folder_description
             ));
 
-            albumThreadFolderSetting = (BooleanSettingView) media.add(new BooleanSettingView(this,
+            albumThreadFolderSetting = media.add(new BooleanSettingView(this,
                     ChanSettings.saveAlbumThreadFolder,
                     R.string.setting_save_album_thread_folder,
                     R.string.setting_save_album_thread_folder_description
@@ -199,28 +199,28 @@ public class MediaSettingsController
                     R.string.setting_video_auto_loop_description
             ));
 
-            videoDefaultMutedSetting = (BooleanSettingView) video.add(new BooleanSettingView(this,
+            videoDefaultMutedSetting = video.add(new BooleanSettingView(this,
                     ChanSettings.videoDefaultMuted,
                     R.string.setting_video_default_muted,
                     R.string.setting_video_default_muted_description
             ));
 
-            headsetDefaultMutedSetting = (BooleanSettingView) video.add(new BooleanSettingView(this,
+            headsetDefaultMutedSetting = video.add(new BooleanSettingView(this,
                     ChanSettings.headsetDefaultMuted,
                     R.string.setting_headset_default_muted,
                     R.string.setting_headset_default_muted_description
             ));
 
             video.add(new BooleanSettingView(this,
-                    ChanSettings.videoOpenExternal,
-                    R.string.setting_video_open_external,
-                    R.string.setting_video_open_external_description
+                    ChanSettings.neverShowWebmControls,
+                    "Never show WEBM controls",
+                    "Treats WEBMs like GIFs; tap to close, double tap to play/pause, always automatically loops."
             ));
 
             video.add(new BooleanSettingView(this,
-                    ChanSettings.videoStream,
-                    R.string.setting_video_stream,
-                    R.string.setting_video_stream_description
+                    ChanSettings.enableSoundposts,
+                    "Enable soundposts",
+                    "Treats images with a filename embedded audio URL as a video, or adds sound to existing videos."
             ));
 
             groups.add(video);
@@ -242,7 +242,7 @@ public class MediaSettingsController
             requiresRestart.add(loading.add(new IntegerSettingView(this,
                     ChanSettings.fileCacheSize,
                     "File cache size (in MB)",
-                    "File cache size in MB\nDefault 512MB, 2x for prefetch",
+                    "File cache size in MB\n(x2 if prefetch enabled)",
                     new Pair<>(100, 2000)
             )));
 

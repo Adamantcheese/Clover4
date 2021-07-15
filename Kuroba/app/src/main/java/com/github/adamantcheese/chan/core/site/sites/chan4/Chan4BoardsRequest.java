@@ -19,14 +19,16 @@ package com.github.adamantcheese.chan.core.site.sites.chan4;
 import android.util.JsonReader;
 
 import com.github.adamantcheese.chan.core.model.orm.Board;
-import com.github.adamantcheese.chan.core.net.NetUtilsClasses.JSONProcessor;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.Boards;
+
+import org.jsoup.parser.Parser;
 
 import java.io.IOException;
 
 public class Chan4BoardsRequest
-        extends JSONProcessor<Boards> {
+        implements NetUtilsClasses.Converter<Boards, JsonReader> {
     private final Site site;
 
     public Chan4BoardsRequest(Site site) {
@@ -34,7 +36,7 @@ public class Chan4BoardsRequest
     }
 
     @Override
-    public Boards process(JsonReader reader)
+    public Boards convert(JsonReader reader)
             throws Exception {
         Boards list = new Boards();
 
@@ -140,15 +142,25 @@ public class Chan4BoardsRequest
                 case "preupload_captcha":
                     board.preuploadCaptcha = reader.nextInt() == 1;
                     break;
-                case "troll_flags":
                 case "country_flags":
                     board.countryFlags = reader.nextInt() == 1;
+                    //board.boardFlags.putAll(ISO_3166_1_ALPHA_2_FLAGS.INSTANCE.getFLAG_CODES());
+                    break;
+                case "board_flags":
+                    reader.beginObject();
+                    while (reader.hasNext()) {
+                        board.boardFlags.put(reader.nextName(), reader.nextString());
+                    }
+                    reader.endObject();
                     break;
                 case "math_tags":
                     board.mathTags = reader.nextInt() == 1;
                     break;
+                case "forced_anon":
+                    board.forcedAnon = reader.nextInt() == 1;
+                    break;
                 case "meta_description":
-                    board.description = reader.nextString();
+                    board.description = Parser.unescapeEntities(reader.nextString(), false);
                     break;
                 case "is_archived":
                     board.archive = reader.nextInt() == 1;

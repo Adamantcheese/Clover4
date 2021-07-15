@@ -107,13 +107,14 @@ public class ImageViewerAdapter
 
         Balloon.Builder hintBuilder = AndroidUtils.getBaseToolTip(view.getContext())
                 .setPreferenceName(mode.name() + "HINT")
-                .setArrowVisible(false);
+                .setIsVisibleArrow(false);
         switch (mode) {
             case VIDEO:
-                hintBuilder.setText("Single tap for controls\nDouble tap to pause/play").build().show(view);
+                hintBuilder.setText("Single tap for controls" + "\nDouble tap to pause/play").build().show(view);
                 break;
             case BIGIMAGE:
-                hintBuilder.setText("Two finger tap to rotate").build().show(view);
+                hintBuilder.setText("Two finger tap to rotate" + "\nSecond finger left of first rotates clockwise"
+                        + "\nSecond finger right of first rotates counter-clockwise").build().show(view);
                 break;
             case GIFIMAGE:
                 hintBuilder.setText("Double tap to pause/play").build().show(view);
@@ -149,7 +150,7 @@ public class ImageViewerAdapter
     public void toggleTransparency(PostImage postImage) {
         MultiImageView view = find(postImage);
         if (view != null) {
-            view.toggleTransparency();
+            view.toggleOpacity();
         }
     }
 

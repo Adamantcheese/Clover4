@@ -38,16 +38,15 @@ import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.presenter.BoardSetupPresenter;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.Boards;
-import com.github.adamantcheese.chan.ui.helper.BoardHelper;
 import com.github.adamantcheese.chan.ui.layout.BoardAddLayout;
 import com.github.adamantcheese.chan.ui.view.CrossfadeView;
+import com.github.adamantcheese.chan.ui.widget.CancellableSnackbar;
 import com.github.adamantcheese.chan.utils.RecyclerUtils;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.snackbar.Snackbar;
 
 import javax.inject.Inject;
 
-import static android.text.TextUtils.isEmpty;
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
 import static com.github.adamantcheese.chan.ui.widget.DefaultAlertDialog.getDefaultAlertBuilder;
@@ -178,26 +177,20 @@ public class BoardSetupController
 
     @Override
     public void showRemovedSnackbar(final Board board) {
-        Snackbar snackbar = Snackbar.make(view,
-                getString(R.string.setup_board_removed, BoardHelper.getName(board)),
-                Snackbar.LENGTH_LONG
+        CancellableSnackbar.showSnackbar(view,
+                getString(R.string.setup_board_removed, board.getFormattedName()),
+                R.string.undo,
+                v -> presenter.undoRemoveBoard(board)
         );
-        snackbar.setGestureInsetBottomIgnored(true);
-
-        snackbar.setAction(R.string.undo, v -> presenter.undoRemoveBoard(board));
-        snackbar.show();
     }
 
     @Override
     public void boardsWereAdded(int count) {
         savedBoardsRecycler.smoothScrollToPosition(savedAdapter.getItemCount());
 
-        Snackbar snackbar = Snackbar.make(view,
-                getString(R.string.setup_board_added, getQuantityString(R.plurals.board, count, count)),
-                Snackbar.LENGTH_LONG
+        CancellableSnackbar.showSnackbar(view,
+                getString(R.string.setup_board_added, getQuantityString(R.plurals.board, count, count))
         );
-        snackbar.setGestureInsetBottomIgnored(true);
-        snackbar.show();
     }
 
     private class SavedBoardsAdapter
@@ -227,12 +220,10 @@ public class BoardSetupController
         @Override
         public void onBindViewHolder(SavedBoardHolder holder, int position) {
             Board savedBoard = savedBoards.get(position);
-            holder.text.setText(BoardHelper.getName(savedBoard));
-            String description = BoardHelper.getDescription(savedBoard);
-            boolean enableDescription = !isEmpty(description);
-            if (enableDescription) {
+            holder.text.setText(savedBoard.getFormattedName());
+            if (!savedBoard.description.isEmpty()) {
                 holder.description.setVisibility(VISIBLE);
-                holder.description.setText(description);
+                holder.description.setText(savedBoard.description);
             } else {
                 holder.description.setVisibility(GONE);
             }
@@ -240,13 +231,13 @@ public class BoardSetupController
             // Fill the height for the title if there is no description, otherwise make room
             // for it.
             ViewGroup.LayoutParams p = holder.text.getLayoutParams();
-            int newHeight = enableDescription ? dp(28) : dp(56);
+            int newHeight = !savedBoard.description.isEmpty() ? dp(28) : dp(56);
             if (newHeight != p.height) {
                 p.height = newHeight;
                 holder.text.setLayoutParams(p);
             }
             holder.text.setGravity(Gravity.CENTER_VERTICAL);
-            holder.text.setPadding(dp(8), dp(8), dp(8), enableDescription ? 0 : dp(8));
+            holder.text.setPadding(dp(8), dp(8), dp(8), !savedBoard.description.isEmpty() ? 0 : dp(8));
         }
 
         @Override

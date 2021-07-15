@@ -16,12 +16,18 @@
  */
 package com.github.adamantcheese.chan.core.site.http;
 
+import com.github.adamantcheese.chan.core.site.Site;
+
 public class LoginRequest {
+    public final Site site;
     public final String user;
     public final String pass;
+    public final boolean login;
 
-    public LoginRequest(String user, String pass) {
+    public LoginRequest(Site site, String user, String pass, boolean login) {
+        this.site = site;
         this.user = user;
         this.pass = pass;
+        this.login = login;
     }
 }

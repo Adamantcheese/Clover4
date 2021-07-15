@@ -18,14 +18,12 @@ package com.github.adamantcheese.chan.ui.view;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.drawable.BitmapDrawable;
-import android.net.Uri;
 import android.util.AttributeSet;
 import android.view.GestureDetector;
 import android.view.View;
@@ -36,70 +34,68 @@ import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.core.content.FileProvider;
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleObserver;
+import androidx.lifecycle.LifecycleOwner;
 import androidx.lifecycle.OnLifecycleEvent;
 
 import com.davemorrissey.labs.subscaleview.ImageSource;
 import com.github.adamantcheese.chan.R;
-import com.github.adamantcheese.chan.StartActivity;
-import com.github.adamantcheese.chan.core.cache.FileCacheListener;
-import com.github.adamantcheese.chan.core.cache.FileCacheV2;
-import com.github.adamantcheese.chan.core.cache.MediaSourceCallback;
-import com.github.adamantcheese.chan.core.cache.downloader.CancelableDownload;
-import com.github.adamantcheese.chan.core.cache.stream.WebmStreamingDataSource;
-import com.github.adamantcheese.chan.core.cache.stream.WebmStreamingSource;
-import com.github.adamantcheese.chan.core.di.NetModule;
 import com.github.adamantcheese.chan.core.model.PostImage;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.net.NetUtils;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
+import com.github.adamantcheese.chan.core.net.ProgressResponseBody;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
+import com.github.adamantcheese.chan.ui.widget.CancellableSnackbar;
 import com.github.adamantcheese.chan.utils.BackgroundUtils;
 import com.github.adamantcheese.chan.utils.Logger;
 import com.github.adamantcheese.chan.utils.PostUtils;
-import com.github.k1rakishou.fsaf.file.RawFile;
+import com.github.adamantcheese.chan.utils.StringUtils;
 import com.google.android.exoplayer2.MediaItem;
 import com.google.android.exoplayer2.Player;
 import com.google.android.exoplayer2.SimpleExoPlayer;
-import com.google.android.exoplayer2.audio.AudioListener;
+import com.google.android.exoplayer2.analytics.AnalyticsListener;
+import com.google.android.exoplayer2.ext.okhttp.OkHttpDataSource;
 import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.MergingMediaSource;
 import com.google.android.exoplayer2.source.ProgressiveMediaSource;
 import com.google.android.exoplayer2.ui.PlayerView;
-import com.google.android.exoplayer2.upstream.DataSource;
-import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
-import com.google.android.exoplayer2.util.Util;
+import com.google.android.exoplayer2.upstream.cache.CacheDataSource;
+import com.google.android.exoplayer2.upstream.cache.LeastRecentlyUsedCacheEvictor;
+import com.google.android.exoplayer2.upstream.cache.SimpleCache;
+import com.google.android.material.snackbar.Snackbar;
 
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
-import java.lang.reflect.Field;
+import java.net.URLDecoder;
 import java.util.Locale;
-
-import javax.inject.Inject;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import okhttp3.Call;
 import okhttp3.HttpUrl;
+import okhttp3.internal.http2.StreamResetException;
+import okio.Buffer;
 import pl.droidsonroids.gif.GifDrawable;
 import pl.droidsonroids.gif.GifImageView;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
-import static com.github.adamantcheese.chan.Chan.inject;
+import static com.github.adamantcheese.chan.core.di.AppModule.getCacheDir;
+import static com.github.adamantcheese.chan.core.net.NetUtils.MB;
+import static com.github.adamantcheese.chan.core.net.NetUtilsClasses.BUFFER_CONVERTER;
 import static com.github.adamantcheese.chan.core.net.NetUtilsClasses.BitmapResult;
 import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppContext;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppFileProvider;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getAudioManager;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.getDefaultMuteState;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.openIntent;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.waitForMeasure;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.openLink;
 
 public class MultiImageView
         extends FrameLayout
-        implements MultiImageViewGestureDetector.MultiImageViewGestureDetectorCallbacks, AudioListener,
-                   LifecycleObserver {
+        implements MultiImageViewGestureDetector.MultiImageViewGestureDetectorCallbacks, LifecycleObserver,
+                   ProgressResponseBody.ProgressListener {
 
     public enum Mode {
         UNLOADED,
@@ -111,26 +107,16 @@ public class MultiImageView
         OTHER
     }
 
-    @Inject
-    FileCacheV2 fileCacheV2;
-    @Inject
-    WebmStreamingSource webmStreamingSource;
-
     private PostImage postImage;
     private Callback callback;
     private boolean op;
 
     private Mode mode = Mode.UNLOADED;
-    private Call thumbnailRequest;
-    private CancelableDownload bigImageRequest;
-    private CancelableDownload gifRequest;
-    private CancelableDownload videoRequest;
-    private CancelableDownload otherRequest;
+    private Call request;
     private SimpleExoPlayer exoPlayer;
 
     private boolean hasContent = false;
-    private boolean mediaSourceCancel = false;
-    private boolean transparentBackground = ChanSettings.transparencyOn.get();
+    private boolean requestedBackgroundOpacity = ChanSettings.useOpaqueBackgrounds.get();
     private boolean imageAlreadySaved = false;
     private final GestureDetector gestureDetector;
     private final View exoClickHandler;
@@ -152,11 +138,10 @@ public class MultiImageView
         exoClickHandler.setId(Integer.MAX_VALUE);
         exoClickHandler.setOnTouchListener((view, motionEvent) -> gestureDetector.onTouchEvent(motionEvent));
 
-        inject(this);
         setOnClickListener(null);
 
-        if (context instanceof StartActivity) {
-            ((StartActivity) context).getLifecycle().addObserver(this);
+        if (context instanceof LifecycleOwner) {
+            ((LifecycleOwner) context).getLifecycle().addObserver(this);
         }
     }
 
@@ -180,11 +165,11 @@ public class MultiImageView
     public void setMode(final Mode newMode, boolean center) {
         this.mode = newMode;
         hasContent = false;
-        waitForMeasure(this, view -> {
+        post(() -> {
             switch (newMode) {
                 case LOWRES:
                     setThumbnail(center);
-                    transparentBackground = ChanSettings.transparencyOn.get();
+                    requestedBackgroundOpacity = ChanSettings.useOpaqueBackgrounds.get();
                     break;
                 case BIGIMAGE:
                     setBigImage();
@@ -202,7 +187,6 @@ public class MultiImageView
                     setOther();
                     break;
             }
-            return true;
         });
     }
 
@@ -210,7 +194,6 @@ public class MultiImageView
         return mode;
     }
 
-    @NonNull
     @Override
     public View getActiveView() {
         View ret = null;
@@ -233,7 +216,7 @@ public class MultiImageView
                 ret = findView(WebView.class);
                 break;
         }
-        return ret == null ? new View(getContext()) : ret;
+        return ret;
     }
 
     @Nullable
@@ -292,11 +275,6 @@ public class MultiImageView
         callback.onSwipeToSaveImage();
     }
 
-    private boolean getDefaultMuteState() {
-        return ChanSettings.videoDefaultMuted.get() && (ChanSettings.headsetDefaultMuted.get()
-                || !getAudioManager().isWiredHeadsetOn());
-    }
-
     public void setVolume(boolean muted) {
         if (exoPlayer != null) {
             exoPlayer.setVolume(muted ? 0f : 1f);
@@ -308,34 +286,56 @@ public class MultiImageView
         super.onDetachedFromWindow();
         cancelLoad();
 
-        if (getContext() instanceof StartActivity) {
-            ((StartActivity) getContext()).getLifecycle().removeObserver(this);
+        if (getContext() instanceof LifecycleOwner) {
+            ((LifecycleOwner) getContext()).getLifecycle().removeObserver(this);
+        }
+    }
+
+    @Override
+    public void onDownloadProgress(HttpUrl source, long bytesRead, long contentLength, boolean firstUpdate, boolean done) {
+        if(request != null) {
+            if(!request.request().url().equals(source)) return;
+            BackgroundUtils.runOnMainThread(() -> {
+                if (done) {
+                    callback.hideProgress(MultiImageView.this);
+                    return;
+                }
+                if (firstUpdate) {
+                    callback.onProgress(MultiImageView.this, 0, 1);
+                    return;
+                }
+
+                if (contentLength != -1) {
+                    callback.onProgress(MultiImageView.this, bytesRead, contentLength);
+                }
+            });
         }
     }
 
     private void setThumbnail(boolean center) {
         BackgroundUtils.ensureMainThread();
 
-        if (thumbnailRequest != null) {
-            return;
+        if (request != null) {
+            request.cancel();
+            request = null;
         }
 
         final HttpUrl thumbnailURL = postImage.getThumbnailUrl();
-        thumbnailRequest = NetUtils.makeBitmapRequest(thumbnailURL, new BitmapResult() {
+        request = NetUtils.makeBitmapRequest(thumbnailURL, new BitmapResult() {
             @Override
             public void onBitmapFailure(@NonNull HttpUrl source, Exception e) {
-                thumbnailRequest = null;
+                request = null;
                 callback.hideProgress(MultiImageView.this);
                 if (center) onError(e);
             }
 
             @Override
-            public void onBitmapSuccess(@NonNull HttpUrl source, @NonNull Bitmap bitmap) {
-                thumbnailRequest = null;
+            public void onBitmapSuccess(@NonNull HttpUrl source, @NonNull Bitmap bitmap, boolean fromCache) {
+                request = null;
                 callback.hideProgress(MultiImageView.this);
                 onThumbnailBitmap(bitmap);
             }
-        }, getWidth(), getHeight());
+        });
     }
 
     private void onThumbnailBitmap(Bitmap bitmap) {
@@ -350,139 +350,98 @@ public class MultiImageView
         }
     }
 
-    private void setBigImage() {
-        BackgroundUtils.ensureMainThread();
+    private void processError(Exception e) {
+        if (request != null) {
+            request.cancel();
+            request = null;
+        }
 
-        if (bigImageRequest != null) {
+        if ("Canceled".equals(e.getMessage()) || e instanceof StreamResetException) {
             return;
         }
 
-        bigImageRequest = fileCacheV2.enqueueChunkedDownloadFileRequest(postImage,
-                postImage.size,
-                callback.getLoadable().site.getChunkDownloaderSiteProperties(),
-                new FileCacheListener() {
+        if (e instanceof NetUtilsClasses.HttpCodeException) {
+            if (((NetUtilsClasses.HttpCodeException) e).isServerErrorNotFound()) {
+                onNotFoundError();
+            }
+        }
+        onError(e);
+    }
 
+    private void setBigImage() {
+        // if this image has a sound file attached to the filename, set this to be a video instead and use exoplayer to display it
+        if (ChanSettings.enableSoundposts.get() && SOUND_URL_PATTERN.matcher(postImage.filename).find()) {
+            mode = Mode.VIDEO;
+            setVideo();
+            return;
+        }
+
+        if (request != null) {
+            request.cancel();
+            request = null;
+        }
+
+        request = NetUtils.makeRequest(NetUtils.applicationClient.getHttpRedirectClient(),
+                postImage.imageUrl,
+                BUFFER_CONVERTER,
+                new NetUtilsClasses.MainThreadResponseResult<>(new NetUtilsClasses.ResponseResult<Buffer>() {
                     @Override
-                    public void onStart(int chunksCount) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onStartDownload(MultiImageView.this, chunksCount);
+                    public void onFailure(Exception e) {
+                        processError(e);
                     }
 
                     @Override
-                    public void onProgress(int chunkIndex, long downloaded, long total) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onProgress(MultiImageView.this, chunkIndex, downloaded, total);
+                    public void onSuccess(Buffer result) {
+                        request = null;
+                        setBitImageFileInternal(result, true);
                     }
-
-                    @Override
-                    public void onSuccess(RawFile file, boolean immediate) {
-                        BackgroundUtils.ensureMainThread();
-
-                        setBitImageFileInternal(new File(file.getFullPath()), true);
-
-                        callback.onDownloaded(postImage);
-                    }
-
-                    @Override
-                    public void onNotFound() {
-                        BackgroundUtils.ensureMainThread();
-
-                        onNotFoundError();
-                    }
-
-                    @Override
-                    public void onFail(Exception exception) {
-                        BackgroundUtils.ensureMainThread();
-
-                        onError(exception);
-                    }
-
-                    @Override
-                    public void onEnd() {
-                        BackgroundUtils.ensureMainThread();
-
-                        bigImageRequest = null;
-                        callback.hideProgress(MultiImageView.this);
-                    }
-                }
+                }),
+                this,
+                NetUtilsClasses.ONE_DAY_CACHE
         );
     }
 
     private void setGif() {
-        BackgroundUtils.ensureMainThread();
+        // gifs are not playable by exoplayer, so unfortunately soundposts for gifs don't work
 
-        if (gifRequest != null) {
-            return;
+        if (request != null) {
+            request.cancel();
+            request = null;
         }
 
-        gifRequest = fileCacheV2.enqueueChunkedDownloadFileRequest(postImage,
-                postImage.size,
-                callback.getLoadable().site.getChunkDownloaderSiteProperties(),
-                new FileCacheListener() {
-
+        request = NetUtils.makeRequest(NetUtils.applicationClient,
+                postImage.imageUrl,
+                BUFFER_CONVERTER,
+                new NetUtilsClasses.MainThreadResponseResult<>(new NetUtilsClasses.ResponseResult<Buffer>() {
                     @Override
-                    public void onStart(int chunksCount) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onStartDownload(MultiImageView.this, chunksCount);
+                    public void onFailure(Exception e) {
+                        processError(e);
                     }
 
                     @Override
-                    public void onProgress(int chunkIndex, long downloaded, long total) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onProgress(MultiImageView.this, chunkIndex, downloaded, total);
-                    }
-
-                    @Override
-                    public void onSuccess(RawFile file, boolean immediate) {
-                        BackgroundUtils.ensureMainThread();
-
+                    public void onSuccess(Buffer result) {
+                        request = null;
                         if (!hasContent || mode == Mode.GIFIMAGE) {
-                            setGifFile(new File(file.getFullPath()));
+                            setGifFile(result);
                         }
-
-                        callback.onDownloaded(postImage);
                     }
-
-                    @Override
-                    public void onNotFound() {
-                        BackgroundUtils.ensureMainThread();
-
-                        onNotFoundError();
-                    }
-
-                    @Override
-                    public void onFail(Exception exception) {
-                        BackgroundUtils.ensureMainThread();
-
-                        onError(exception);
-                    }
-
-                    @Override
-                    public void onEnd() {
-                        BackgroundUtils.ensureMainThread();
-
-                        gifRequest = null;
-                        callback.hideProgress(MultiImageView.this);
-                    }
-                }
+                }),
+                this,
+                NetUtilsClasses.ONE_DAY_CACHE
         );
     }
 
-    private void setGifFile(File file) {
+    private void setGifFile(Buffer buffer) {
         GifDrawable drawable;
         try {
-            drawable = new GifDrawable(file.getAbsolutePath());
+            drawable = new GifDrawable(buffer.peek().readByteArray());
 
             // For single frame gifs, use the scaling image instead
             // The region decoder doesn't work for gifs, so we unfortunately
             // have to use the more memory intensive non tiling mode.
             if (drawable.getNumberOfFrames() == 1) {
                 drawable.recycle();
-                setBitImageFileInternal(file, false);
+                setBitImageFileInternal(buffer, false);
                 return;
             }
         } catch (IOException e) {
@@ -505,296 +464,144 @@ public class MultiImageView
         view.setOnClickListener(null);
         view.setOnTouchListener((view1, motionEvent) -> gestureDetector.onTouchEvent(motionEvent));
         onModeLoaded(Mode.GIFIMAGE, view);
-        toggleTransparency();
     }
+
+    private static final ProgressiveMediaSource.Factory MEDIA_FACTORY;
+
+    static {
+        OkHttpDataSource.Factory okHttpFactory = new OkHttpDataSource.Factory(NetUtils.applicationClient);
+        okHttpFactory.setUserAgent(NetUtils.USER_AGENT);
+        okHttpFactory.setCacheControl(NetUtilsClasses.ONE_DAY_CACHE);
+        CacheDataSource.Factory cacheFactory = new CacheDataSource.Factory();
+        cacheFactory.setUpstreamDataSourceFactory(okHttpFactory);
+        cacheFactory.setCache(new SimpleCache(new File(getCacheDir(), "exoplayer"), new LeastRecentlyUsedCacheEvictor(50 * MB)));
+        MEDIA_FACTORY = new ProgressiveMediaSource.Factory(cacheFactory);
+    }
+
+    private static final Pattern SOUND_URL_PATTERN = Pattern.compile(".*\\[sound=(.*)\\]", Pattern.CASE_INSENSITIVE);
 
     private void setVideo() {
-        BackgroundUtils.ensureMainThread();
-
-        if (ChanSettings.videoStream.get()) {
-            openVideoInternalStream();
-        } else {
-            openVideoExternal();
-        }
-    }
-
-    private void openVideoInternalStream() {
-        webmStreamingSource.createMediaSource(postImage, new MediaSourceCallback() {
-            @Override
-            public void onMediaSourceReady(@Nullable MediaSource source) {
-                BackgroundUtils.ensureMainThread();
-
-                if (source == null) {
-                    onError(new IllegalArgumentException("Source is null"));
-                    return;
-                }
-
-                synchronized (MultiImageView.this) {
-                    if (mediaSourceCancel) {
-                        return;
-                    }
-
-                    if (!hasContent || mode == Mode.VIDEO) {
-                        PlayerView exoVideoView = new PlayerView(getContext());
-                        exoPlayer = new SimpleExoPlayer.Builder(getContext()).build();
-                        exoVideoView.setPlayer(exoPlayer);
-
-                        exoPlayer.setRepeatMode(ChanSettings.videoAutoLoop.get()
-                                ? Player.REPEAT_MODE_ALL
-                                : Player.REPEAT_MODE_OFF);
-
-                        exoPlayer.setMediaSource(source);
-                        exoPlayer.prepare();
-                        exoPlayer.setVolume(0f);
-                        exoPlayer.addAudioListener(MultiImageView.this);
-                        exoVideoView.setOnClickListener(null);
-                        exoVideoView.setOnTouchListener((view, motionEvent) -> gestureDetector.onTouchEvent(motionEvent));
-                        exoVideoView.setUseController(false);
-                        exoVideoView.setControllerHideOnTouch(false);
-                        exoVideoView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
-                        exoVideoView.setUseArtwork(true);
-                        exoVideoView.setDefaultArtwork(getContext().getDrawable(R.drawable.ic_fluent_speaker_24_filled));
-                        NetUtils.makeBitmapRequest(postImage.thumbnailUrl, new BitmapResult() {
-                            @Override
-                            public void onBitmapFailure(
-                                    @NonNull HttpUrl source,
-                                    Exception e
-                            ) {} // use the default drawable
-
-                            @Override
-                            public void onBitmapSuccess(@NonNull HttpUrl source, @NonNull Bitmap bitmap) {
-                                exoVideoView.setDefaultArtwork(new BitmapDrawable(getContext().getResources(), bitmap));
-                            }
-                        });
-                        exoPlayer.setVolume(getDefaultMuteState() ? 0 : 1);
-                        exoPlayer.play();
-                        onModeLoaded(Mode.VIDEO, exoVideoView);
-                        callback.onDownloaded(postImage);
-                    }
-                }
-            }
-
-            @Override
-            public void onError(@NotNull Throwable error) {
-                BackgroundUtils.ensureMainThread();
-
-                Logger.e(this, "Error while trying to stream a webm", error);
-                showToast(getContext(), "Couldn't open webm in streaming mode, error = " + error.getMessage());
-            }
-        });
-    }
-
-    private void openVideoExternal() {
-        BackgroundUtils.ensureMainThread();
-
-        if (videoRequest != null) {
-            return;
-        }
-
-        videoRequest = fileCacheV2.enqueueChunkedDownloadFileRequest(postImage,
-                postImage.size,
-                callback.getLoadable().site.getChunkDownloaderSiteProperties(),
-                new FileCacheListener() {
-
-                    @Override
-                    public void onStart(int chunksCount) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onStartDownload(MultiImageView.this, chunksCount);
-                    }
-
-                    @Override
-                    public void onProgress(int chunkIndex, long downloaded, long total) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onProgress(MultiImageView.this, chunkIndex, downloaded, total);
-                    }
-
-                    @Override
-                    public void onSuccess(RawFile file, boolean immediate) {
-                        BackgroundUtils.ensureMainThread();
-
-                        if (!hasContent || mode == Mode.VIDEO) {
-                            setVideoFile(new File(file.getFullPath()));
-                        }
-
-                        callback.onDownloaded(postImage);
-                    }
-
-                    @Override
-                    public void onNotFound() {
-                        BackgroundUtils.ensureMainThread();
-
-                        onNotFoundError();
-                    }
-
-                    @Override
-                    public void onFail(Exception exception) {
-                        BackgroundUtils.ensureMainThread();
-
-                        onError(exception);
-                    }
-
-                    @Override
-                    public void onEnd() {
-                        BackgroundUtils.ensureMainThread();
-
-                        videoRequest = null;
-                        callback.hideProgress(MultiImageView.this);
-                    }
-                }
-        );
-    }
-
-    private void setVideoFile(final File file) {
-        if (ChanSettings.videoOpenExternal.get()) {
-            Intent intent = new Intent(Intent.ACTION_VIEW);
-
-            Uri uriForFile = FileProvider.getUriForFile(getAppContext(), getAppFileProvider(), file);
-
-            intent.setDataAndType(uriForFile, "video/*");
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-            openIntent(intent);
-
-            onModeLoaded(Mode.VIDEO, null);
-        } else {
+        if (!hasContent || mode == Mode.VIDEO) {
             PlayerView exoVideoView = new PlayerView(getContext());
             exoPlayer = new SimpleExoPlayer.Builder(getContext()).build();
             exoVideoView.setPlayer(exoPlayer);
-            String userAgent = Util.getUserAgent(getAppContext(), NetModule.USER_AGENT);
-            DataSource.Factory dataSourceFactory = new DefaultDataSourceFactory(getContext(), userAgent);
-            ProgressiveMediaSource.Factory progressiveFactory = new ProgressiveMediaSource.Factory(dataSourceFactory);
-            MediaSource videoSource = progressiveFactory.createMediaSource(MediaItem.fromUri(Uri.fromFile(file)));
+
+            try {
+                if (ChanSettings.enableSoundposts.get()) {
+                    Matcher m = SOUND_URL_PATTERN.matcher(postImage.filename);
+                    if (!m.find()) {
+                        throw new Exception("Fallback to no soundpost");
+                    }
+                    String soundURL = URLDecoder.decode(m.group(1), "UTF-8");
+                    if (!StringUtils.startsWithAny(soundURL, "http://", "https://")) {
+                        soundURL = "https://" + soundURL;
+                    }
+                    MediaSource soundSource = MEDIA_FACTORY.createMediaSource(MediaItem.fromUri(soundURL));
+                    if (postImage.type == PostImage.Type.STATIC) {
+                        exoPlayer.setMediaSource(soundSource);
+                    } else {
+                        exoPlayer.setMediaSource(new MergingMediaSource(soundSource,
+                                MEDIA_FACTORY.createMediaSource(MediaItem.fromUri(postImage.imageUrl.toString()))
+                        ));
+                    }
+                } else {
+                    throw new Exception("Fallback to no soundpost");
+                }
+            } catch (Exception e) {
+                exoPlayer.setMediaSource(MEDIA_FACTORY.createMediaSource(MediaItem.fromUri(postImage.imageUrl.toString())));
+            }
+            exoPlayer.prepare();
 
             exoPlayer.setRepeatMode(ChanSettings.videoAutoLoop.get() ? Player.REPEAT_MODE_ALL : Player.REPEAT_MODE_OFF);
 
-            exoPlayer.setMediaSource(videoSource);
-            exoPlayer.prepare();
-            exoPlayer.addAudioListener(this);
+            exoPlayer.addAnalyticsListener(new AnalyticsListener() {
+                @Override
+                public void onAudioDecoderInitialized(
+                        @NonNull EventTime eventTime,
+                        @NonNull String decoderName,
+                        long initializedTimestampMs,
+                        long initializationDurationMs
+                ) {
+                    callback.onAudioLoaded(MultiImageView.this);
+                }
+            });
             exoVideoView.setOnClickListener(null);
             exoVideoView.setOnTouchListener((view, motionEvent) -> gestureDetector.onTouchEvent(motionEvent));
             exoVideoView.setUseController(false);
             exoVideoView.setControllerHideOnTouch(false);
             exoVideoView.setShowBuffering(PlayerView.SHOW_BUFFERING_WHEN_PLAYING);
             exoVideoView.setUseArtwork(true);
-            exoVideoView.setDefaultArtwork(getContext().getDrawable(R.drawable.ic_fluent_speaker_24_filled));
-            NetUtils.makeBitmapRequest(postImage.thumbnailUrl, new BitmapResult() {
-                @Override
-                public void onBitmapFailure(@NonNull HttpUrl source, Exception e) {} // use the default drawable
+            exoVideoView.setDefaultArtwork(getContext().getDrawable(R.drawable.ic_fluent_speaker_2_24_filled));
+            NetUtils.makeBitmapRequest(
+                    postImage.type == PostImage.Type.STATIC ? postImage.imageUrl : postImage.thumbnailUrl,
+                    new BitmapResult() {
+                        @Override
+                        public void onBitmapFailure(
+                                @NonNull HttpUrl source, Exception e
+                        ) {} // use the default drawable
 
-                @Override
-                public void onBitmapSuccess(@NonNull HttpUrl source, @NonNull Bitmap bitmap) {
-                    exoVideoView.setDefaultArtwork(new BitmapDrawable(getContext().getResources(), bitmap));
-                }
-            });
-            exoPlayer.setVolume(getDefaultMuteState() ? 0 : 1);
+                        @Override
+                        public void onBitmapSuccess(
+                                @NonNull HttpUrl source, @NonNull Bitmap bitmap, boolean fromCache
+                        ) {
+                            exoVideoView.setDefaultArtwork(new BitmapDrawable(getContext().getResources(), bitmap));
+                        }
+                    }
+            );
+            setVolume(getDefaultMuteState());
             exoPlayer.play();
             onModeLoaded(Mode.VIDEO, exoVideoView);
         }
     }
 
-    @Override
-    public void onAudioSessionId(int audioSessionId) {
-        if (exoPlayer != null && exoPlayer.getAudioFormat() != null) {
-            callback.onAudioLoaded(this);
+    private void setOther() {
+        if (request != null) {
+            request.cancel();
+            request = null;
+        }
+
+        if (!hasContent || mode == Mode.OTHER) {
+            CancellableSnackbar.showSnackbar(this,
+                    R.string.open_link_confirmation,
+                    R.string.open,
+                    v -> openLink(postImage.imageUrl.toString())
+            );
+            onModeLoaded(Mode.OTHER, null);
         }
     }
 
-    private void setOther() {
-        BackgroundUtils.ensureMainThread();
+    // these colors are specific to 4chan for the time being
+    private static final int BACKGROUND_COLOR_SFW = Color.argb(255, 214, 218, 240);
+    private static final int BACKGROUND_COLOR_SFW_OP = Color.argb(255, 238, 242, 255);
+    private static final int BACKGROUND_COLOR_NSFW = Color.argb(255, 240, 224, 214);
+    private static final int BACKGROUND_COLOR_NSFW_OP = Color.argb(255, 255, 255, 238);
 
-        if (otherRequest != null) {
+    public void toggleOpacity() {
+        View activeView = getActiveView();
+        if (!(activeView instanceof CustomScaleImageView || activeView instanceof GifImageView)) {
+            callback.onOpacityChanged(this, false, requestedBackgroundOpacity);
             return;
         }
 
-        otherRequest = fileCacheV2.enqueueChunkedDownloadFileRequest(postImage,
-                postImage.size,
-                callback.getLoadable().site.getChunkDownloaderSiteProperties(),
-                new FileCacheListener() {
-
-                    @Override
-                    public void onStart(int chunksCount) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onStartDownload(MultiImageView.this, chunksCount);
-                    }
-
-                    @Override
-                    public void onProgress(int chunkIndex, long downloaded, long total) {
-                        BackgroundUtils.ensureMainThread();
-
-                        callback.onProgress(MultiImageView.this, chunkIndex, downloaded, total);
-                    }
-
-                    @Override
-                    public void onSuccess(RawFile file, boolean immediate) {
-                        BackgroundUtils.ensureMainThread();
-
-                        if (!hasContent || mode == Mode.OTHER) {
-                            Intent intent = new Intent(Intent.ACTION_VIEW);
-                            Uri uriForFile = FileProvider.getUriForFile(getAppContext(),
-                                    getAppFileProvider(),
-                                    new File(file.getFullPath())
-                            );
-
-                            intent.setDataAndType(uriForFile, getAppContext().getContentResolver().getType(uriForFile));
-                            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                            openIntent(intent);
-                            onModeLoaded(Mode.OTHER, null);
-                        }
-                        callback.onDownloaded(postImage);
-                    }
-
-                    @Override
-                    public void onNotFound() {
-                        BackgroundUtils.ensureMainThread();
-
-                        onNotFoundError();
-                    }
-
-                    @Override
-                    public void onFail(Exception exception) {
-                        BackgroundUtils.ensureMainThread();
-
-                        onError(exception);
-                    }
-
-                    @Override
-                    public void onEnd() {
-                        BackgroundUtils.ensureMainThread();
-
-                        otherRequest = null;
-                        callback.hideProgress(MultiImageView.this);
-                    }
-                }
-        );
-    }
-
-    public void toggleTransparency() {
-        transparentBackground = !transparentBackground;
-        // these colors are specific to 4chan for the time being
-        final int BACKGROUND_COLOR_SFW = Color.argb(255, 214, 218, 240);
-        final int BACKGROUND_COLOR_SFW_OP = Color.argb(255, 238, 242, 255);
-        final int BACKGROUND_COLOR_NSFW = Color.argb(255, 240, 224, 214);
-        final int BACKGROUND_COLOR_NSFW_OP = Color.argb(255, 255, 255, 238);
         int boardColor = callback.getLoadable().board.workSafe
                 ? (op ? BACKGROUND_COLOR_SFW_OP : BACKGROUND_COLOR_SFW)
                 : (op ? BACKGROUND_COLOR_NSFW_OP : BACKGROUND_COLOR_NSFW);
-        View activeView = getActiveView();
-        if (!(activeView instanceof CustomScaleImageView || activeView instanceof GifImageView)) return;
-        boolean isImage = activeView instanceof CustomScaleImageView;
-        int backgroundColor = !transparentBackground ? Color.TRANSPARENT : boardColor;
-        if (isImage) {
-            ((CustomScaleImageView) activeView).setTileBackgroundColor(backgroundColor);
+        int newBackgroundColor = requestedBackgroundOpacity ? boardColor : Color.TRANSPARENT;
+
+        if (activeView instanceof CustomScaleImageView) {
+            ((CustomScaleImageView) activeView).setTileBackgroundColor(newBackgroundColor);
         } else {
             ((GifImageView) activeView).getDrawable()
-                    .setColorFilter(new PorterDuffColorFilter(backgroundColor, PorterDuff.Mode.DST_OVER));
+                    .setColorFilter(new PorterDuffColorFilter(newBackgroundColor, PorterDuff.Mode.DST_OVER));
         }
+
+        callback.onOpacityChanged(this, true, requestedBackgroundOpacity);
+        requestedBackgroundOpacity = !requestedBackgroundOpacity;
     }
 
-    private void setBitImageFileInternal(File file, boolean tiling) {
+    private void setBitImageFileInternal(Buffer buffer, boolean tiling) {
         final CustomScaleImageView image = new CustomScaleImageView(getContext());
-        image.setImage(ImageSource.uri(file.getAbsolutePath()).tiling(tiling));
+        image.setImage(ImageSource.buffer(buffer).tiling(tiling));
         //this is required because unlike the other views, if we don't have layout dimensions, the callback won't be called
         //see https://github.com/davemorrissey/subsampling-scale-image-view/issues/143
         addView(image, 0, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -804,7 +611,6 @@ public class MultiImageView
                 if (!hasContent || mode == Mode.BIGIMAGE) {
                     callback.hideProgress(MultiImageView.this);
                     onModeLoaded(Mode.BIGIMAGE, image);
-                    toggleTransparency();
                 }
             }
 
@@ -825,8 +631,6 @@ public class MultiImageView
 
     @SuppressLint("SetJavaScriptEnabled")
     private void setWebview() {
-        BackgroundUtils.ensureMainThread();
-
         final WebView webView = new WebView(getContext());
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
@@ -841,6 +645,7 @@ public class MultiImageView
             }
         });
         webView.getSettings().setJavaScriptEnabled(true);
+        webView.getSettings().setUserAgentString(NetUtils.USER_AGENT);
         webView.loadUrl(postImage.imageUrl.toString());
         webView.setBackgroundColor(Color.TRANSPARENT);
         if (!hasContent || mode == Mode.WEBVIEW) {
@@ -878,34 +683,13 @@ public class MultiImageView
     }
 
     private void cancelLoad() {
-        if (thumbnailRequest != null) {
-            thumbnailRequest.cancel();
-            thumbnailRequest = null;
-        }
-        if (bigImageRequest != null) {
-            bigImageRequest.cancel();
-            bigImageRequest = null;
-        }
-        if (gifRequest != null) {
-            gifRequest.cancel();
-            gifRequest = null;
-        }
-        if (videoRequest != null) {
-            videoRequest.cancel();
-            videoRequest = null;
-        }
-        if (otherRequest != null) {
-            otherRequest.cancel();
-            otherRequest = null;
-        }
-
-        synchronized (this) {
-            mediaSourceCancel = true;
+        if (request != null) {
+            request.cancel();
+            request = null;
         }
 
         if (exoPlayer != null) {
             // ExoPlayer will keep loading resources if we don't release it here.
-            releaseStreamCallbacks();
             exoPlayer.release();
             exoPlayer = null;
         }
@@ -919,7 +703,6 @@ public class MultiImageView
                 View child = getChildAt(i);
                 if (child != view) {
                     if (child instanceof PlayerView) {
-                        releaseStreamCallbacks();
                         ((PlayerView) child).getPlayer().release();
                     } else if (child instanceof WebView) {
                         ((WebView) child).destroy();
@@ -940,26 +723,7 @@ public class MultiImageView
 
         hasContent = true;
         callback.onModeLoaded(this, mode);
-    }
-
-    private void releaseStreamCallbacks() {
-        if (ChanSettings.videoStream.get()) {
-            try {
-                Field mediaSource = exoPlayer.getClass().getDeclaredField("mediaSource");
-                mediaSource.setAccessible(true);
-                if (mediaSource.get(exoPlayer) != null) {
-                    ProgressiveMediaSource source = (ProgressiveMediaSource) mediaSource.get(exoPlayer);
-                    Field dataSource = source.getClass().getDeclaredField("dataSourceFactory");
-                    dataSource.setAccessible(true);
-                    DataSource.Factory factory = (DataSource.Factory) dataSource.get(source);
-                    ((WebmStreamingDataSource) factory.createDataSource()).clearListeners();
-                    dataSource.setAccessible(false);
-                }
-                mediaSource.setAccessible(false);
-            } catch (Exception ignored) {
-                // data source likely is from a file rather than a stream, ignore any exceptions
-            }
-        }
+        toggleOpacity();
     }
 
     @Override
@@ -968,7 +732,7 @@ public class MultiImageView
             GifImageView gif = (GifImageView) child;
             if (gif.getDrawable() instanceof GifDrawable) {
                 GifDrawable drawable = (GifDrawable) gif.getDrawable();
-                if (drawable.getFrameByteCount() > 100 * 1024 * 1024) { // max size from RecordingCanvas
+                if (drawable.getFrameByteCount() > 100 * MB) { // max size from RecordingCanvas
                     onError(new Exception("Uncompressed GIF too large (>100MB), " + PostUtils.getReadableFileSize(
                             drawable.getFrameByteCount())));
                     return false;
@@ -987,15 +751,13 @@ public class MultiImageView
 
         void onSwipeToSaveImage();
 
-        void onStartDownload(MultiImageView multiImageView, int chunksCount);
-
-        void onProgress(MultiImageView multiImageView, int chunkIndex, long current, long total);
-
-        void onDownloaded(PostImage postImage);
+        void onProgress(MultiImageView multiImageView, long current, long total);
 
         void onModeLoaded(MultiImageView multiImageView, Mode mode);
 
         void onAudioLoaded(MultiImageView multiImageView);
+
+        void onOpacityChanged(MultiImageView multiImageView, boolean hasOpacity, boolean opaque);
 
         void hideProgress(MultiImageView multiImageView);
 

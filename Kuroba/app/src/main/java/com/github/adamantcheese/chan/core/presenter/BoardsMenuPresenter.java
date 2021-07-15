@@ -16,14 +16,22 @@
  */
 package com.github.adamantcheese.chan.core.presenter;
 
+import android.annotation.SuppressLint;
+import android.content.Context;
+import android.graphics.drawable.Drawable;
+
 import androidx.annotation.Nullable;
 
+import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.core.manager.BoardManager;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.repository.BoardRepository;
 import com.github.adamantcheese.chan.core.site.Site;
+import com.github.adamantcheese.chan.core.site.SiteIcon;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.Boards;
+import com.github.adamantcheese.chan.core.site.common.CommonSite;
 import com.github.adamantcheese.chan.ui.helper.BoardHelper;
+import com.github.adamantcheese.chan.utils.BackgroundUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -35,6 +43,7 @@ import javax.inject.Inject;
 import static com.github.adamantcheese.chan.core.presenter.BoardsMenuPresenter.Item.Type.BOARD;
 import static com.github.adamantcheese.chan.core.presenter.BoardsMenuPresenter.Item.Type.SEARCH;
 import static com.github.adamantcheese.chan.core.presenter.BoardsMenuPresenter.Item.Type.SITE;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrColor;
 
 public class BoardsMenuPresenter
         implements Observer {
@@ -50,11 +59,11 @@ public class BoardsMenuPresenter
         allBoards = boardManager.getAllBoardsObservable();
     }
 
-    public void create(Callback callback, Board selectedBoard) {
+    public void create(Callback callback, Board selectedBoard, Context context) {
 
         this.allBoards.addObserver(this);
 
-        items = new Items();
+        items = new Items(context);
 
         updateWithFilter();
 
@@ -88,40 +97,68 @@ public class BoardsMenuPresenter
     public static class Items
             extends Observable {
         public List<Item> items = new ArrayList<>();
+        private BackgroundUtils.Cancelable boardsCall;
+        private final Context context;
 
-        public Items() {
+        public Items(Context context) {
+            this.context = context;
         }
 
-        public void update(List<BoardRepository.SiteBoards> allBoards, String filter) {
-            items.clear();
-            int itemIdCounter = 1;
+        public void update(final List<BoardRepository.SiteBoards> allBoards, final String filter) {
+            if (boardsCall != null) {
+                boardsCall.cancel();
+            }
+            boardsCall = BackgroundUtils.runWithExecutor(BackgroundUtils.backgroundService, () -> {
+                List<Item> newItems = new ArrayList<>();
+                int itemIdCounter = 1;
 
-            items.add(new Item(0, SEARCH));
+                newItems.add(new Item(0, SEARCH));
 
-            for (BoardRepository.SiteBoards siteAndBoards : allBoards) {
-                Site site = siteAndBoards.site;
-                Boards boards = siteAndBoards.boards;
+                for (BoardRepository.SiteBoards siteAndBoards : allBoards) {
+                    Site site = siteAndBoards.site;
+                    Boards boards = siteAndBoards.boards;
 
-                items.add(new Item(itemIdCounter++, site));
+                    newItems.add(new Item(itemIdCounter++, site));
 
-                if (filter == null || filter.isEmpty()) {
-                    for (Board board : boards) {
-                        if (board.saved) {
-                            items.add(new Item(itemIdCounter++, board));
+                    if (filter == null || filter.isEmpty()) {
+                        for (Board board : boards) {
+                            if (board.saved) {
+                                newItems.add(new Item(itemIdCounter++, board));
+                            }
+                        }
+                    } else {
+                        // cap the amount of outputs to 5 instead of all boards, which could be a lot!
+                        int count = 0;
+                        for (Board b : BoardHelper.search(boards, filter)) {
+                            if (count == 5) break;
+                            newItems.add(new Item(itemIdCounter++, b));
+                            count++;
                         }
                     }
-                } else {
-                    int count = 0;
-                    for (Board b : BoardHelper.search(boards, filter)) {
-                        if (count == 5) break;
-                        items.add(new Item(itemIdCounter++, b));
-                        count++;
-                    }
                 }
-            }
 
-            setChanged();
-            notifyObservers();
+                if (newItems.size() == 1) {
+                    CommonSite setupSite = new CommonSite() {
+                        @Override
+                        public void setup() {
+                            setName("App Setup");
+                            @SuppressLint("UseCompatLoadingForDrawables")
+                            Drawable settingsDrawable = context.getDrawable(R.drawable.ic_fluent_settings_24_filled);
+                            settingsDrawable.setTint(getAttrColor(context, android.R.attr.textColorSecondary));
+                            setIcon(SiteIcon.fromDrawable(settingsDrawable));
+                        }
+                    };
+                    setupSite.setup();
+                    newItems.add(new Item(1, setupSite));
+                }
+
+                return newItems;
+            }, result -> {
+                items.clear();
+                items.addAll(result);
+                setChanged();
+                notifyObservers();
+            });
         }
 
         public int getCount() {

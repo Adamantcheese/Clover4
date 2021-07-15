@@ -18,17 +18,13 @@ package com.github.adamantcheese.chan.core.di;
 
 import com.github.adamantcheese.chan.core.database.DatabaseFilterManager;
 import com.github.adamantcheese.chan.core.database.DatabasePinManager;
-import com.github.adamantcheese.chan.core.di.NetModule.OkHttpClientWithUtils;
 import com.github.adamantcheese.chan.core.manager.BoardManager;
 import com.github.adamantcheese.chan.core.manager.FilterEngine;
 import com.github.adamantcheese.chan.core.manager.FilterWatchManager;
 import com.github.adamantcheese.chan.core.manager.ReportManager;
-import com.github.adamantcheese.chan.core.manager.WakeManager;
 import com.github.adamantcheese.chan.core.manager.WatchManager;
 import com.github.adamantcheese.chan.core.repository.BoardRepository;
 import com.github.adamantcheese.chan.utils.Logger;
-import com.github.k1rakishou.fsaf.FileManager;
-import com.google.gson.Gson;
 
 import org.codejargon.feather.Provides;
 
@@ -39,8 +35,6 @@ import javax.inject.Singleton;
 import static com.github.adamantcheese.chan.core.di.AppModule.getCacheDir;
 
 public class ManagerModule {
-    private static final String CRASH_LOGS_DIR_NAME = "crashlogs";
-
     @Provides
     @Singleton
     public BoardManager provideBoardManager(BoardRepository boardRepository) {
@@ -58,38 +52,27 @@ public class ManagerModule {
     @Provides
     @Singleton
     public WatchManager provideWatchManager(
-            DatabasePinManager databasePinManager, WakeManager wakeManager, FileManager fileManager
+            DatabasePinManager databasePinManager
     ) {
         Logger.d(AppModule.DI_TAG, "Watch manager");
-        return new WatchManager(databasePinManager, wakeManager);
-    }
-
-    @Provides
-    @Singleton
-    public WakeManager provideWakeManager() {
-        Logger.d(AppModule.DI_TAG, "Wake manager");
-        return new WakeManager();
+        return new WatchManager(databasePinManager);
     }
 
     @Provides
     @Singleton
     public FilterWatchManager provideFilterWatchManager(
-            WakeManager wakeManager,
             BoardRepository boardRepository,
             FilterEngine filterEngine,
-            WatchManager watchManager,
-            Gson gson
+            WatchManager watchManager
     ) {
         Logger.d(AppModule.DI_TAG, "Filter watch manager");
-        return new FilterWatchManager(wakeManager, boardRepository, filterEngine, watchManager, gson);
+        return new FilterWatchManager(boardRepository, filterEngine, watchManager);
     }
 
     @Provides
     @Singleton
-    public ReportManager provideReportManager(Gson gson, OkHttpClientWithUtils clientWithUtils) {
+    public ReportManager provideReportManager() {
         Logger.d(AppModule.DI_TAG, "Report manager");
-        File cacheDir = getCacheDir();
-
-        return new ReportManager(gson, new File(cacheDir, CRASH_LOGS_DIR_NAME), clientWithUtils);
+        return new ReportManager(new File(getCacheDir(), "crashlogs"));
     }
 }

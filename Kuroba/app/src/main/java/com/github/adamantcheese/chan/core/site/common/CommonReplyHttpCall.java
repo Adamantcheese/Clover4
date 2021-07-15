@@ -16,15 +16,18 @@
  */
 package com.github.adamantcheese.chan.core.site.common;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
+import com.github.adamantcheese.chan.core.net.ProgressRequestBody;
 import com.github.adamantcheese.chan.core.site.http.HttpCall;
-import com.github.adamantcheese.chan.core.site.http.ProgressRequestBody;
 import com.github.adamantcheese.chan.core.site.http.ReplyResponse;
 
 import org.jsoup.Jsoup;
 
+import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -34,14 +37,17 @@ import okhttp3.Request;
 import okhttp3.Response;
 
 public abstract class CommonReplyHttpCall
-        extends HttpCall {
+        extends HttpCall<ReplyResponse> {
     private static final Pattern THREAD_NO_PATTERN = Pattern.compile("<!-- thread:([0-9]+),no:([0-9]+) -->");
 
-    public final ReplyResponse replyResponse;
+    public final Loadable originatingLoadable;
 
-    public CommonReplyHttpCall(Loadable loadable) {
-        super(loadable.site);
-        replyResponse = new ReplyResponse(loadable);
+    public CommonReplyHttpCall(
+            @NonNull NetUtilsClasses.ResponseResult<ReplyResponse> callback,
+            Loadable originatingLoadable
+    ) {
+        super(callback);
+        this.originatingLoadable = originatingLoadable;
     }
 
     @Override
@@ -53,12 +59,15 @@ public abstract class CommonReplyHttpCall
 
         addParameters(formBuilder, progressListener);
 
-        HttpUrl replyUrl = getSite().endpoints().reply(replyResponse.originatingLoadable);
+        HttpUrl replyUrl = originatingLoadable.site.endpoints().reply(originatingLoadable);
         requestBuilder.url(replyUrl).addHeader("Referer", replyUrl.toString()).post(formBuilder.build());
     }
 
     @Override
-    public void process(Response response, String result) {
+    public ReplyResponse convert(Response response)
+            throws IOException {
+        ReplyResponse replyResponse = new ReplyResponse(originatingLoadable);
+        String responseString = response.body().string();
         /*
         FOR A REGULAR REPLY
         <!-- thread:3255892,no:3259817 -->
@@ -72,10 +81,10 @@ public abstract class CommonReplyHttpCall
 
         First parameter is always parsed as threadNo, second always as postNo
         */
-        if (result.contains("errmsg")) {
-            replyResponse.errorMessage = Jsoup.parse(result).select("#errmsg").first().html();
+        if (responseString.contains("errmsg")) {
+            replyResponse.errorMessage = Jsoup.parse(responseString).select("#errmsg").first().html();
         } else {
-            Matcher threadNoMatcher = THREAD_NO_PATTERN.matcher(result);
+            Matcher threadNoMatcher = THREAD_NO_PATTERN.matcher(responseString);
             if (threadNoMatcher.find()) {
                 try {
                     replyResponse.threadNo = Integer.parseInt(threadNoMatcher.group(1));
@@ -89,6 +98,7 @@ public abstract class CommonReplyHttpCall
                 }
             }
         }
+        return replyResponse;
     }
 
     public abstract void addParameters(

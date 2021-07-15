@@ -28,8 +28,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 
-import androidx.recyclerview.widget.GridLayoutManager;
-import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.adamantcheese.chan.R;
@@ -55,7 +53,7 @@ public class Toolbar
     private final RecyclerView.OnScrollListener recyclerViewOnScrollListener = new RecyclerView.OnScrollListener() {
         @Override
         public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
-            if (isAtTheTopOfThread(recyclerView)) {
+            if (!recyclerView.canScrollVertically(-1)) {
                 setCollapse(TOOLBAR_COLLAPSE_SHOW, false);
             } else {
                 processScrollCollapse(dy, false);
@@ -313,23 +311,6 @@ public class Toolbar
     @Override
     public void updateViewForItem(NavigationItem item) {
         navigationItemContainer.update(item);
-    }
-
-    private boolean isAtTheTopOfThread(RecyclerView recyclerView) {
-        RecyclerView.LayoutManager layoutManager = recyclerView.getLayoutManager();
-        if (layoutManager == null) {
-            return false;
-        }
-
-        int firstVisibleElement = -1;
-
-        if (layoutManager instanceof GridLayoutManager) {
-            firstVisibleElement = ((GridLayoutManager) layoutManager).findFirstCompletelyVisibleItemPosition();
-        } else if (layoutManager instanceof LinearLayoutManager) {
-            firstVisibleElement = ((LinearLayoutManager) layoutManager).findFirstCompletelyVisibleItemPosition();
-        }
-
-        return firstVisibleElement == 0;
     }
 
     public interface ToolbarCallback {

@@ -21,7 +21,6 @@ import android.util.AttributeSet;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.LinearLayout;
@@ -64,7 +63,6 @@ public class BoardAddLayout
         // View binding
         SearchLayout search = findViewById(R.id.search);
         RecyclerView suggestionsRecycler = findViewById(R.id.suggestions);
-        Button checkAllButton = findViewById(R.id.select_all);
 
         // Adapters
         suggestionsAdapter = new SuggestionsAdapter();
@@ -72,7 +70,6 @@ public class BoardAddLayout
         // View setup
         search.setCallback(this);
 
-        checkAllButton.setOnClickListener(v -> suggestionsAdapter.selectAll());
         suggestionsRecycler.setAdapter(suggestionsAdapter);
 
         suggestionsRecycler.requestFocus();
@@ -98,9 +95,6 @@ public class BoardAddLayout
     public void onSearchEntered(String entered) {
         presenter.searchEntered(entered);
     }
-
-    @Override
-    public void onClearPressedWhenEmpty() {}
 
     @Override
     public void suggestionsWereChanged(List<BoardSuggestion> suggestionList) {
@@ -132,13 +126,6 @@ public class BoardAddLayout
         public void setSuggestionList(List<BoardSuggestion> suggestions) {
             suggestionList.clear();
             suggestionList.addAll(suggestions);
-            notifyDataSetChanged();
-        }
-
-        public void selectAll() {
-            for (BoardSuggestion suggestion : suggestionList) {
-                suggestion.checked = true;
-            }
             notifyDataSetChanged();
         }
 

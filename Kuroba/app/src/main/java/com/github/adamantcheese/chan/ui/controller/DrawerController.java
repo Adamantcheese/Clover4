@@ -38,6 +38,7 @@ import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.github.adamantcheese.chan.BuildConfig;
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.controller.Controller;
 import com.github.adamantcheese.chan.controller.NavigationController;
@@ -80,6 +81,7 @@ import static com.github.adamantcheese.chan.core.database.DatabaseLoadableManage
 import static com.github.adamantcheese.chan.ui.controller.DrawerController.HeaderAction.CLEAR;
 import static com.github.adamantcheese.chan.ui.controller.DrawerController.HeaderAction.CLEAR_ALL;
 import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.clearAnySelectionsAndKeyboards;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getQuantityString;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getRes;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
@@ -111,7 +113,7 @@ public class DrawerController
     private final ItemTouchHelper.Callback drawerItemTouchHelperCallback = new ItemTouchHelper.Callback() {
         @Override
         public int getMovementFlags(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
-            return makeMovementFlags(UP | DOWN, RIGHT | LEFT);
+            return makeMovementFlags(pinMode ? (UP | DOWN) : 0, LEFT | RIGHT);
         }
 
         @Override
@@ -164,9 +166,6 @@ public class DrawerController
     @Inject
     WatchManager watchManager;
 
-    @Inject
-    WakeManager wakeManager;
-
     public DrawerController(Context context) {
         super(context);
         EventBus.getDefault().register(this);
@@ -189,6 +188,7 @@ public class DrawerController
 
             @Override
             public void onDrawerOpened(@NonNull View drawerView) {
+                clearAnySelectionsAndKeyboards(context);
                 AndroidUtils.getBaseToolTip(context)
                         .setPreferenceName("DrawerPinHistoryHint")
                         .setArrowOrientation(ArrowOrientation.TOP)
@@ -260,7 +260,7 @@ public class DrawerController
         refreshLayout.setOnRefreshListener(() -> {
             refreshLayout.setRefreshing(false);
             if (pinMode) {
-                wakeManager.onBroadcastReceived(true);
+                WakeManager.getInstance().onBroadcastReceived(!BuildConfig.DEBUG);
             } else {
                 if (recyclerView.getAdapter() == null) return;
                 ((DrawerHistoryAdapter) recyclerView.getAdapter()).load();
@@ -298,7 +298,7 @@ public class DrawerController
     @Override
     public boolean onBack() {
         if (!inViewMode) {
-            inViewMode = !inViewMode;
+            inViewMode = true;
             buttonSearchSwitch.toggle(inViewMode, true);
             return true;
         } else if (drawerLayout.isDrawerOpen(drawer)) {
@@ -356,13 +356,9 @@ public class DrawerController
     private void onHeaderClickedInternal(boolean all) {
         final List<Pin> pins = watchManager.clearPins(all);
         if (!pins.isEmpty()) {
-            openMessage(
-                    getString(R.string.drawer_pins_cleared,
-                            getQuantityString(R.plurals.bookmark, pins.size(), pins.size())
-                    ),
-                    v -> watchManager.addAll(pins),
-                    getString(R.string.undo)
-            );
+            openMessage(getString(R.string.drawer_pins_cleared,
+                    getQuantityString(R.plurals.bookmark, pins.size(), pins.size())
+            ), v -> watchManager.addAll(pins), getString(R.string.undo));
         } else {
             int text;
             synchronized (watchManager.getAllPins()) {
@@ -383,7 +379,11 @@ public class DrawerController
             toggleView.setImageResource(R.drawable.ic_fluent_bookmark_24_filled);
             ((TextView) buttonSearchSwitch.findViewById(R.id.header_text)).setText(R.string.drawer_history);
             handler.removeCallbacksAndMessages(null);
-
+            synchronized (watchManager.getAllPins()) {
+                for (Pin p : watchManager.getAllPins()) {
+                    p.drawerHighlight = false; // clear all highlights
+                }
+            }
             recyclerView.setAdapter(new DrawerHistoryAdapter(this));
         } else {
             // swap to pin mode

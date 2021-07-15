@@ -19,6 +19,7 @@ package com.github.adamantcheese.chan.core.site;
 import static com.github.adamantcheese.chan.core.site.SiteAuthentication.Type.CAPTCHA1;
 import static com.github.adamantcheese.chan.core.site.SiteAuthentication.Type.CAPTCHA2;
 import static com.github.adamantcheese.chan.core.site.SiteAuthentication.Type.CAPTCHA2_NOJS;
+import static com.github.adamantcheese.chan.core.site.SiteAuthentication.Type.CUSTOM_JSON;
 import static com.github.adamantcheese.chan.core.site.SiteAuthentication.Type.GENERIC_WEBVIEW;
 import static com.github.adamantcheese.chan.core.site.SiteAuthentication.Type.NONE;
 
@@ -29,6 +30,7 @@ public class SiteAuthentication {
         CAPTCHA1,
         CAPTCHA2,
         CAPTCHA2_NOJS,
+        CUSTOM_JSON,
         GENERIC_WEBVIEW
     }
 
@@ -57,22 +59,28 @@ public class SiteAuthentication {
         return a;
     }
 
+    public static SiteAuthentication fromCustomJson(String baseUrl) {
+        SiteAuthentication a = new SiteAuthentication(CUSTOM_JSON);
+        a.baseUrl = baseUrl;
+        return a;
+    }
+
     public static SiteAuthentication fromUrl(String url, String retryText, String successText) {
         SiteAuthentication a = new SiteAuthentication(GENERIC_WEBVIEW);
-        a.url = url;
+        a.baseUrl = url;
         a.retryText = retryText;
         a.successText = successText;
         return a;
     }
 
+    // All
     public final Type type;
+    public String baseUrl;
 
     // captcha1 & captcha2
     public String siteKey;
-    public String baseUrl;
 
     // generic webview
-    public String url;
     public String retryText;
     public String successText;
 

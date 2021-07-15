@@ -31,11 +31,11 @@ import com.github.adamantcheese.chan.core.model.InternalSiteArchive.ArchiveItem;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.presenter.ArchivePresenter;
-import com.github.adamantcheese.chan.ui.helper.BoardHelper;
-import com.github.adamantcheese.chan.ui.toolbar.ToolbarMenuItem;
+import com.github.adamantcheese.chan.ui.theme.ThemeHelper;
 import com.github.adamantcheese.chan.ui.view.CrossfadeView;
 import com.github.adamantcheese.chan.ui.view.FastScrollerHelper;
 import com.github.adamantcheese.chan.utils.RecyclerUtils;
+import com.github.adamantcheese.chan.utils.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -77,8 +77,10 @@ public class ArchiveController
         view = (ViewGroup) LayoutInflater.from(context).inflate(R.layout.controller_archive, null);
 
         // Navigation
-        navigation.title = getString(R.string.archive_title, BoardHelper.getName(board));
-        navigation.buildMenu().withItem(R.drawable.ic_fluent_search_24_filled, this::searchClicked).build();
+        navigation.title = getString(R.string.archive_title, board.getFormattedName());
+        navigation.buildMenu().withItem(R.drawable.ic_fluent_search_24_filled,
+                (item) -> ((ToolbarNavigationController) navigationController).showSearch()
+        ).build();
 
         // View binding
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh);
@@ -99,10 +101,6 @@ public class ArchiveController
         presenter.onRefresh();
     }
 
-    private void searchClicked(ToolbarMenuItem item) {
-        ((ToolbarNavigationController) navigationController).showSearch();
-    }
-
     @Override
     public void onSearchEntered(String entered) {
         presenter.onSearchEntered(entered);
@@ -114,16 +112,13 @@ public class ArchiveController
     }
 
     @Override
-    public void onNavItemSet() {}
-
-    @Override
     public void onRefresh() {
         presenter.onRefresh();
     }
 
     @Override
-    public void setArchiveItems(List<ArchiveItem> items) {
-        adapter.setArchiveItems(items);
+    public void setArchiveItems(List<ArchiveItem> items, String filter) {
+        adapter.setArchiveItems(items, filter);
     }
 
     @Override
@@ -154,6 +149,7 @@ public class ArchiveController
 
     private class ArchiveAdapter
             extends RecyclerView.Adapter<ArchiveHolder> {
+        private String filter = "";
         private List<ArchiveItem> archiveItems = new ArrayList<>();
 
         @Override
@@ -168,11 +164,12 @@ public class ArchiveController
 
         @Override
         public void onBindViewHolder(ArchiveHolder holder, int position) {
-            holder.setItem(archiveItems.get(position));
+            holder.setItem(archiveItems.get(position), filter);
         }
 
-        public void setArchiveItems(List<ArchiveItem> archiveItems) {
+        public void setArchiveItems(List<ArchiveItem> archiveItems, String filter) {
             this.archiveItems = archiveItems;
+            this.filter = filter;
             notifyDataSetChanged();
         }
     }
@@ -192,9 +189,13 @@ public class ArchiveController
             view.setOnClickListener(v -> onItemClicked(item));
         }
 
-        public void setItem(ArchiveItem item) {
+        public void setItem(ArchiveItem item, String filter) {
             this.item = item;
-            ((TextView) itemView).setText(item.description);
+            ((TextView) itemView).setText(StringUtils.applySearchSpans(
+                    ThemeHelper.getTheme(),
+                    item.description,
+                    filter
+            ));
         }
     }
 }

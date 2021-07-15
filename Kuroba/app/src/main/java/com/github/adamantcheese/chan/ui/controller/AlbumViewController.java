@@ -34,8 +34,8 @@ import com.github.adamantcheese.chan.ui.toolbar.ToolbarMenuItem;
 import com.github.adamantcheese.chan.ui.view.GridRecyclerView;
 import com.github.adamantcheese.chan.ui.view.ThumbnailView;
 import com.github.adamantcheese.chan.utils.AndroidUtils;
-import com.skydoves.balloon.ArrowConstraints;
 import com.skydoves.balloon.ArrowOrientation;
+import com.skydoves.balloon.ArrowPositionRules;
 
 import java.util.List;
 
@@ -45,7 +45,10 @@ public class AlbumViewController
         extends Controller
         implements ImageViewerController.ImageViewerCallback, ImageViewerController.GoPostCallback,
                    ToolbarNavigationController.ToolbarSearchCallback {
-    private final int DOWNLOAD_ALBUM_ID = 1;
+    private enum MenuId {
+        DOWNLOAD_ALBUM
+    }
+
     private GridRecyclerView recyclerView;
 
     private List<PostImage> postImages;
@@ -77,7 +80,10 @@ public class AlbumViewController
         this.postImages = postImages;
 
         navigation.buildMenu()
-                .withItem(DOWNLOAD_ALBUM_ID, R.drawable.ic_fluent_table_move_down_24_filled, this::downloadAlbumClicked)
+                .withItem(MenuId.DOWNLOAD_ALBUM,
+                        R.drawable.ic_fluent_table_move_below_24_filled,
+                        this::downloadAlbumClicked
+                )
                 .build();
 
         navigation.title = title;
@@ -154,20 +160,14 @@ public class AlbumViewController
     }
 
     @Override
-    public void onSearchVisibilityChanged(boolean visible) {}
-
-    @Override
-    public void onSearchEntered(String entered) {}
-
-    @Override
     public void onNavItemSet() {
         AndroidUtils.getBaseToolTip(context)
-                .setArrowConstraints(ArrowConstraints.ALIGN_ANCHOR)
+                .setArrowPositionRules(ArrowPositionRules.ALIGN_ANCHOR)
                 .setPreferenceName("DownloadAlbumHint")
                 .setArrowOrientation(ArrowOrientation.TOP)
                 .setTextResource(R.string.album_download_hint)
                 .build()
-                .showAlignBottom(navigation.findItem(DOWNLOAD_ALBUM_ID).getView());
+                .showAlignBottom(navigation.findItem(MenuId.DOWNLOAD_ALBUM).getView());
     }
 
     private class AlbumAdapter

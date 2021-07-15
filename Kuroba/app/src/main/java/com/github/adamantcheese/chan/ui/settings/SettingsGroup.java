@@ -16,6 +16,8 @@
  */
 package com.github.adamantcheese.chan.ui.settings;
 
+import com.github.adamantcheese.chan.utils.StringUtils;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -24,6 +26,7 @@ import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
 public class SettingsGroup {
     public final String name;
     public final List<SettingView> settingViews = new ArrayList<>();
+    public final List<SettingView> displayList = new ArrayList<>();
 
     public SettingsGroup(int name) {
         this(getString(name));
@@ -33,8 +36,20 @@ public class SettingsGroup {
         this.name = name;
     }
 
-    public SettingView add(SettingView settingView) {
+    public <T extends SettingView> T add(T settingView) {
         settingViews.add(settingView);
         return settingView;
+    }
+
+    public void filter(String text) {
+        displayList.clear();
+        for (SettingView settingView : settingViews) {
+            if (StringUtils.containsIgnoreCase(settingView.getTopDescription(), text) || StringUtils.containsIgnoreCase(
+                    settingView.getBottomDescription(),
+                    text
+            )) {
+                displayList.add(settingView);
+            }
+        }
     }
 }

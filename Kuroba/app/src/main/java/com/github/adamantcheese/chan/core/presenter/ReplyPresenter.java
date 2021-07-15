@@ -41,7 +41,6 @@ import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.model.orm.SavedReply;
 import com.github.adamantcheese.chan.core.repository.LastReplyRepository;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
-import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.SiteActions;
 import com.github.adamantcheese.chan.core.site.SiteAuthentication;
 import com.github.adamantcheese.chan.core.site.http.Reply;
@@ -50,18 +49,22 @@ import com.github.adamantcheese.chan.core.site.parser.CommentParser;
 import com.github.adamantcheese.chan.core.site.sites.chan4.Chan4;
 import com.github.adamantcheese.chan.ui.captcha.AuthenticationLayoutCallback;
 import com.github.adamantcheese.chan.ui.captcha.AuthenticationLayoutInterface;
+import com.github.adamantcheese.chan.ui.captcha.CaptchaTokenHolder;
+import com.github.adamantcheese.chan.ui.captcha.CaptchaTokenHolder.CaptchaToken;
 import com.github.adamantcheese.chan.ui.helper.ImagePickDelegate;
 import com.github.adamantcheese.chan.ui.helper.PostHelper;
 import com.github.adamantcheese.chan.utils.BackgroundUtils;
 import com.github.adamantcheese.chan.utils.BitmapUtils;
 import com.github.adamantcheese.chan.utils.Logger;
-import com.github.adamantcheese.chan.utils.StringUtils;
+import com.google.common.io.Files;
 
 import java.io.File;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.github.adamantcheese.chan.Chan.instance;
+import static com.github.adamantcheese.chan.core.site.Site.BoardFeature.FORCED_ANONYMOUS;
 import static com.github.adamantcheese.chan.core.site.Site.BoardFeature.POSTING_IMAGE;
 import static com.github.adamantcheese.chan.core.site.Site.BoardFeature.POSTING_SPOILER;
 import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
@@ -109,9 +112,12 @@ public class ReplyPresenter
         callback.setCommentHint(loadable.isThreadMode());
         callback.showCommentCounter(loadable.board.maxCommentChars > 0);
         callback.enableImageAttach(canPostImages());
+        callback.enableName(canPostName());
 
         switchPage(Page.INPUT);
 
+        callback.openFlag(ChanSettings.alwaysShowPostOptions.get() && (loadable.board.countryFlags
+                || !loadable.board.boardFlags.isEmpty()));
         callback.openPostOptions(ChanSettings.alwaysShowPostOptions.get());
         callback.openSubject(ChanSettings.alwaysShowPostOptions.get() && loadable.isCatalogMode());
     }
@@ -137,6 +143,14 @@ public class ReplyPresenter
         return loadable.site.boardFeature(POSTING_SPOILER, loadable.board);
     }
 
+    public boolean canPostName() {
+        return !loadable.site.boardFeature(FORCED_ANONYMOUS, loadable.board);
+    }
+
+    public Map<String, String> getBoardFlags() {
+        return loadable.board.boardFlags;
+    }
+
     public void onOpen(boolean open) {
         if (open) {
             callback.focusComment();
@@ -159,30 +173,29 @@ public class ReplyPresenter
     public void onMoreClicked() {
         moreOpen = !moreOpen;
         callback.setExpanded(moreOpen);
-        callback.openPostOptions(moreOpen);
+        callback.openPostOptions(moreOpen || ChanSettings.alwaysShowPostOptions.get());
         if (loadable.isCatalogMode()) {
             callback.openSubject(moreOpen || ChanSettings.alwaysShowPostOptions.get());
         }
         if (previewOpen) {
             callback.openPreview(draft.file != null, draft.file);
         }
-        boolean is4chan = loadable.site instanceof Chan4;
         callback.openCommentQuoteButton(moreOpen);
         if (loadable.board.spoilers) {
             callback.openCommentSpoilerButton(moreOpen);
         }
-        if (is4chan && loadable.boardCode.equals("g")) {
+        if (loadable.board.codeTags) {
             callback.openCommentCodeButton(moreOpen);
         }
-        if (is4chan && loadable.boardCode.equals("sci")) {
+        if (loadable.board.mathTags) {
             callback.openCommentEqnButton(moreOpen);
             callback.openCommentMathButton(moreOpen);
         }
-        if (is4chan && (loadable.boardCode.equals("jp") || loadable.boardCode.equals("vip"))) {
+        if (loadable.site instanceof Chan4 && (loadable.boardCode.equals("jp") || loadable.boardCode.equals("vip"))) {
             callback.openCommentSJISButton(moreOpen);
         }
-        if (is4chan && loadable.boardCode.equals("pol")) {
-            callback.openFlag(moreOpen);
+        if (loadable.board.countryFlags || !loadable.board.boardFlags.isEmpty()) {
+            callback.openFlag(moreOpen || ChanSettings.alwaysShowPostOptions.get());
         }
     }
 
@@ -234,7 +247,7 @@ public class ReplyPresenter
         }
 
         draft.spoilerImage = draft.spoilerImage && loadable.board.spoilers;
-        draft.captchaResponse = null;
+        draft.token = null;
 
         return true;
     }
@@ -242,7 +255,7 @@ public class ReplyPresenter
     // Do NOT use the loadable from ReplyPresenter in this method, as it is not guaranteed to match the loadable associated with the reply object
     // Instead use the response's reply to get the loadable or generate a fresh loadable for a new thread
     @Override
-    public void onPostComplete(ReplyResponse replyResponse) {
+    public void onSuccess(ReplyResponse replyResponse) {
         if (replyResponse.posted) {
             LastReplyRepository.putLastReply(replyResponse.originatingLoadable);
             Loadable originatingLoadable = replyResponse.originatingLoadable;
@@ -318,7 +331,7 @@ public class ReplyPresenter
                     error.removeSpan(s);
                 }
                 errorMessage.clear();
-                errorMessage = errorMessage.append(getString(R.string.reply_error_message, "")).append(error);
+                errorMessage.append(getString(R.string.reply_error_message, error));
                 prefixLen += 1;
             }
             errorMessage.setSpan(new StyleSpan(Typeface.BOLD), 0, prefixLen, 0);
@@ -330,13 +343,13 @@ public class ReplyPresenter
     }
 
     @Override
-    public void onUploadingProgress(int percent) {
+    public void onUploadProgress(int percent) {
         //called on a background thread!
         BackgroundUtils.runOnMainThread(() -> callback.onUploadingProgress(percent));
     }
 
     @Override
-    public void onPostError(Exception exception) {
+    public void onFailure(Exception exception) {
         Logger.e(this, "onPostError", exception);
 
         switchPage(Page.INPUT);
@@ -354,15 +367,14 @@ public class ReplyPresenter
 
     @Override
     public void onAuthenticationComplete(
-            AuthenticationLayoutInterface authenticationLayout, String challenge, String response, boolean autoReply
+            AuthenticationLayoutInterface authenticationLayout, CaptchaToken token, boolean autoReply
     ) {
         if (draft == null) {
             switchPage(Page.INPUT);
             return;
         }
 
-        draft.captchaChallenge = challenge;
-        draft.captchaResponse = response;
+        draft.token = token;
 
         long timeLeft = LastReplyRepository.getTimeUntilDraftPostable(loadable);
         if (timeLeft > 0L && !autoReply) {
@@ -405,9 +417,7 @@ public class ReplyPresenter
 
     public void filenameNewClicked() {
         if (draft == null) return;
-        String currentExt = StringUtils.extractFileNameExtension(draft.fileName);
-        currentExt = (currentExt == null) ? "" : "." + currentExt;
-        draft.fileName = System.currentTimeMillis() + currentExt;
+        draft.fileName = System.currentTimeMillis() + "." + Files.getFileExtension(draft.fileName);
         callback.loadDraftIntoViews(draft);
     }
 
@@ -492,9 +502,9 @@ public class ReplyPresenter
         selectedQuote = -1;
         callback.openMessage(null);
         callback.setExpanded(false);
-        callback.openSubject(
-                loadable != null && (ChanSettings.alwaysShowPostOptions.get() && loadable.isCatalogMode()));
-        callback.openFlag(false);
+        callback.openSubject(loadable != null && ChanSettings.alwaysShowPostOptions.get() && loadable.isCatalogMode());
+        callback.openFlag(loadable != null && (loadable.board.countryFlags || !loadable.board.boardFlags.isEmpty())
+                && ChanSettings.alwaysShowPostOptions.get());
         callback.openCommentQuoteButton(false);
         callback.openCommentSpoilerButton(false);
         callback.openCommentCodeButton(false);
@@ -526,14 +536,14 @@ public class ReplyPresenter
                     break;
                 case AUTHENTICATION:
                     callback.setPage(Page.AUTHENTICATION);
-                    SiteAuthentication authentication = loadable.site.actions().postAuthenticate();
+                    SiteAuthentication authentication = loadable.site.actions().postAuthenticate(loadable);
 
                     // cleanup resources tied to the new captcha layout/presenter
                     callback.destroyCurrentAuthentication();
 
                     try {
                         // If the user doesn't have WebView installed it will throw an error
-                        callback.initializeAuthentication(loadable.site,
+                        callback.initializeAuthentication(loadable,
                                 authentication,
                                 this,
                                 useV2NoJsCaptcha,
@@ -582,7 +592,7 @@ public class ReplyPresenter
         callback.setFileName(name);
         previewOpen = true;
 
-        boolean probablyWebm = "webm".equals(StringUtils.extractFileNameExtension(name));
+        boolean probablyWebm = "webm".equalsIgnoreCase(Files.getFileExtension(name));
         int maxSize = probablyWebm ? loadable.board.maxWebmSize : loadable.board.maxFileSize;
         //if the max size is undefined for the board, ignore this message
         if (file != null && file.length() > maxSize && maxSize != -1) {
@@ -619,7 +629,7 @@ public class ReplyPresenter
         void setPage(Page page);
 
         void initializeAuthentication(
-                Site site,
+                Loadable loadable,
                 SiteAuthentication authentication,
                 AuthenticationLayoutCallback callback,
                 boolean useV2NoJsCaptcha,
@@ -679,5 +689,7 @@ public class ReplyPresenter
         void showAuthenticationFailedError(Throwable error);
 
         void enableImageAttach(boolean canAttach);
+
+        void enableName(boolean canName);
     }
 }

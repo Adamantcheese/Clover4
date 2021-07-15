@@ -19,7 +19,6 @@ package com.github.adamantcheese.chan.ui.controller;
 import android.content.Context;
 import android.text.method.LinkMovementMethod;
 import android.view.LayoutInflater;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
@@ -29,11 +28,12 @@ import androidx.core.text.HtmlCompat;
 
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.controller.Controller;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.ResponseResult;
 import com.github.adamantcheese.chan.core.site.Site;
-import com.github.adamantcheese.chan.core.site.SiteActions;
 import com.github.adamantcheese.chan.core.site.http.LoginRequest;
 import com.github.adamantcheese.chan.core.site.http.LoginResponse;
 import com.github.adamantcheese.chan.ui.view.CrossfadeView;
+import com.github.adamantcheese.chan.utils.BackgroundUtils;
 
 import static android.view.View.GONE;
 import static android.view.View.VISIBLE;
@@ -41,8 +41,7 @@ import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.hideKeyboard;
 
 public class LoginController
-        extends Controller
-        implements View.OnClickListener, SiteActions.LoginListener {
+        extends Controller {
     private CrossfadeView crossfadeView;
     private TextView errors;
     private Button button;
@@ -72,13 +71,61 @@ public class LoginController
         inputPin = view.findViewById(R.id.input_pin);
         authenticated = view.findViewById(R.id.authenticated);
 
-        errors.setVisibility(GONE);
+        button.setOnClickListener((v) -> {
+            authBefore();
+            if (site.actions().isLoggedIn()) {
+                site.actions().logout(new ResponseResult<LoginResponse>() {
+                    @Override
+                    public void onFailure(Exception e) {
+                        authFail(getString(R.string.setting_pass_error_logout));
+                        button.setText(R.string.setting_pass_logout);
+                        authAfter();
+                    }
 
-        final boolean loggedIn = site.actions().isLoggedIn();
-        if (loggedIn) {
-            button.setText(R.string.setting_pass_logout);
-        }
-        button.setOnClickListener(this);
+                    @Override
+                    public void onSuccess(LoginResponse loginResponse) {
+                        if (loginResponse.isSuccess()) {
+                            crossfadeView.toggle(true, true);
+                            button.setText(R.string.submit);
+                        } else {
+                            authFail(loginResponse.getMessage());
+                            button.setText(R.string.setting_pass_logout);
+                        }
+
+                        authAfter();
+                    }
+                });
+            } else {
+                site.actions().login(
+                        new LoginRequest(site, inputToken.getText().toString(), inputPin.getText().toString(), true),
+                        new ResponseResult<LoginResponse>() {
+                            @Override
+                            public void onFailure(Exception e) {
+                                authFail(getString(R.string.setting_pass_error_login));
+                                button.setText(R.string.submit);
+                                authAfter();
+                            }
+
+                            @Override
+                            public void onSuccess(LoginResponse loginResponse) {
+                                if (loginResponse.isSuccess()) {
+                                    crossfadeView.toggle(false, true);
+                                    button.setText(R.string.setting_pass_logout);
+                                    authenticated.setText(loginResponse.getMessage());
+                                } else {
+                                    authFail(loginResponse.getMessage());
+                                    button.setText(R.string.submit);
+                                }
+
+                                authAfter();
+                            }
+                        }
+                );
+            }
+
+            errors.setText(null);
+            errors.setVisibility(GONE);
+        });
 
         bottomDescription.setText(HtmlCompat.fromHtml(getString(R.string.setting_pass_bottom_description),
                 HtmlCompat.FROM_HTML_MODE_LEGACY
@@ -89,66 +136,28 @@ public class LoginController
         inputToken.setText(loginDetails.user);
         inputPin.setText(loginDetails.pass);
 
-        // Sanity check
-        if (parentController.view.getWindowToken() == null) {
-            throw new IllegalArgumentException("parentController.view not attached");
+        final boolean loggedIn = site.actions().isLoggedIn();
+        if (loggedIn) {
+            button.setText(R.string.setting_pass_logout);
         }
-
         crossfadeView.toggle(!loggedIn, false);
     }
 
-    @Override
-    public void onClick(View v) {
-        if (v == button) {
-            if (site.actions().isLoggedIn()) {
-                site.actions().logout();
-                crossfadeView.toggle(true, true);
-                button.setText(R.string.submit);
-            } else {
-                hideKeyboard(view);
-                inputToken.setEnabled(false);
-                inputPin.setEnabled(false);
-                button.setEnabled(false);
-                button.setText(R.string.loading);
-
-                String user = inputToken.getText().toString();
-                String pass = inputPin.getText().toString();
-                site.actions().login(new LoginRequest(user, pass), this);
-            }
-
-            errors.setText(null);
-            errors.setVisibility(GONE);
-        }
+    private void authBefore() {
+        hideKeyboard(view);
+        inputToken.setEnabled(false);
+        inputPin.setEnabled(false);
+        button.setEnabled(false);
+        button.setText(R.string.loading);
     }
 
-    @Override
-    public void onLoginComplete(LoginResponse loginResponse) {
-        if (loginResponse.success) {
-            crossfadeView.toggle(false, true);
-            button.setText(R.string.setting_pass_logout);
-            authenticated.setText(loginResponse.message);
-        } else {
-            authFail(loginResponse);
-        }
-
-        authAfter();
-    }
-
-    @Override
-    public void onLoginError(Exception e) {
-        authFail(null);
-        authAfter();
-    }
-
-    private void authFail(LoginResponse response) {
-        String message = getString(R.string.setting_pass_error);
-        if (response != null && response.message != null) {
-            message = response.message;
-        }
-
+    private void authFail(String message) {
         errors.setText(message);
         errors.setVisibility(VISIBLE);
-        button.setText(R.string.submit);
+        BackgroundUtils.runOnMainThread(() -> {
+            errors.setText(null);
+            errors.setVisibility(GONE);
+        }, 5000);
     }
 
     private void authAfter() {

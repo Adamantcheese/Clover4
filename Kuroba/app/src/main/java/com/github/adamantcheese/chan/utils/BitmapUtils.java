@@ -17,6 +17,7 @@ import androidx.exifinterface.media.ExifInterface;
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.core.presenter.ImageReencodingPresenter;
 import com.github.adamantcheese.chan.core.repository.BitmapRepository;
+import com.google.common.io.Files;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -31,15 +32,12 @@ import kotlin.random.Random;
 import static android.graphics.Bitmap.CompressFormat.JPEG;
 import static android.graphics.Bitmap.CompressFormat.PNG;
 import static android.graphics.Bitmap.CompressFormat.WEBP;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppContext;
+import static com.github.adamantcheese.chan.core.di.AppModule.getCacheDir;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getRes;
 
 public class BitmapUtils {
     private static final String TAG = "BitmapUtils";
     private static final int PIXEL_DIFF = 5;
-    private static final String TEMP_FILE_EXTENSION = ".tmp";
-    private static final String TEMP_FILE_NAME = "temp_file_name";
-    private static final String TEMP_FILE_NAME_WITH_CACHE_DIR = "cache/" + TEMP_FILE_NAME;
 
     private static final byte[] PNG_HEADER = new byte[]{(byte) 137, 'P', 'N', 'G', '\r', '\n', 26, '\n'};
     private static final byte[] JPEG_HEADER = new byte[]{(byte) 0xFF, (byte) 0xD8};
@@ -103,7 +101,9 @@ public class BitmapUtils {
         File tempFile = null;
 
         try {
-            tempFile = getTempFilename();
+            deleteOldTempFiles(getCacheDir().listFiles());
+
+            tempFile = File.createTempFile("temp_file_name", null, getCacheDir());
 
             try (FileOutputStream output = new FileOutputStream(tempFile)) {
                 newBitmap.compress(newFormat, imageOptions.reencodeQuality, output);
@@ -123,21 +123,13 @@ public class BitmapUtils {
         }
     }
 
-    private static File getTempFilename()
-            throws IOException {
-        File outputDir = getAppContext().getCacheDir();
-        deleteOldTempFiles(outputDir.listFiles());
-
-        return File.createTempFile(TEMP_FILE_NAME, TEMP_FILE_EXTENSION, outputDir);
-    }
-
     private static void deleteOldTempFiles(File[] files) {
         if (files == null || files.length == 0) {
             return;
         }
 
         for (File file : files) {
-            if (file.getAbsolutePath().contains(TEMP_FILE_NAME_WITH_CACHE_DIR)) {
+            if ("tmp".equalsIgnoreCase(Files.getFileExtension(file.getAbsolutePath()))) {
                 if (!file.delete()) {
                     Logger.w(TAG, "Could not delete old temp image file: " + file.getAbsolutePath());
                 }
@@ -289,7 +281,8 @@ public class BitmapUtils {
             result = scaleBitmap(frameBitmap, maxWidth, maxHeight);
             boolean hasAudio = "yes".equals(video.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO));
             if (hasAudio && addAudioIcon) {
-                Bitmap audioIconBitmap = BitmapFactory.decodeResource(getRes(), R.drawable.ic_fluent_speaker_24_filled);
+                Bitmap audioIconBitmap =
+                        BitmapFactory.decodeResource(getRes(), R.drawable.ic_fluent_speaker_2_24_filled);
                 Bitmap audioBitmap = Bitmap.createScaledBitmap(audioIconBitmap,
                         audioIconBitmap.getWidth() * 3,
                         audioIconBitmap.getHeight() * 3,

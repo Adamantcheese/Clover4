@@ -16,10 +16,8 @@
  */
 package com.github.adamantcheese.chan.core.site.sites.chan4;
 
-import android.webkit.CookieManager;
-import android.webkit.WebView;
-
 import androidx.annotation.NonNull;
+import androidx.core.util.Pair;
 
 import com.github.adamantcheese.chan.BuildConfig;
 import com.github.adamantcheese.chan.core.model.InternalSiteArchive;
@@ -27,8 +25,11 @@ import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.net.NetUtils;
-import com.github.adamantcheese.chan.core.net.NetUtilsClasses.HTMLProcessor;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.MainThreadResponseResult;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.PassthroughBitmapResult;
 import com.github.adamantcheese.chan.core.net.NetUtilsClasses.ResponseResult;
+import com.github.adamantcheese.chan.core.settings.primitives.BooleanSetting;
 import com.github.adamantcheese.chan.core.settings.primitives.OptionsSetting;
 import com.github.adamantcheese.chan.core.settings.primitives.StringSetting;
 import com.github.adamantcheese.chan.core.settings.provider.SettingProvider;
@@ -44,32 +45,35 @@ import com.github.adamantcheese.chan.core.site.SiteUrlHandler;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.Boards;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.CaptchaType;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.ChanPages;
-import com.github.adamantcheese.chan.core.site.common.CommonReplyHttpCall;
-import com.github.adamantcheese.chan.core.site.common.CommonSite.CommonCallModifier;
 import com.github.adamantcheese.chan.core.site.common.FutabaChanReader;
 import com.github.adamantcheese.chan.core.site.http.DeleteRequest;
-import com.github.adamantcheese.chan.core.site.http.HttpCall;
+import com.github.adamantcheese.chan.core.site.http.DeleteResponse;
 import com.github.adamantcheese.chan.core.site.http.LoginRequest;
 import com.github.adamantcheese.chan.core.site.http.LoginResponse;
 import com.github.adamantcheese.chan.core.site.parser.ChanReader;
-import com.github.adamantcheese.chan.utils.BackgroundUtils;
 import com.github.adamantcheese.chan.utils.Logger;
 
-import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import kotlin.random.Random;
+import okhttp3.Cookie;
 import okhttp3.HttpUrl;
 import okhttp3.Request;
+import okhttp3.Response;
 
-import static com.github.adamantcheese.chan.core.site.common.CommonDataStructs.CaptchaType.V2NOJS;
+import static com.github.adamantcheese.chan.core.site.SiteSetting.Type.BOOLEAN;
+import static com.github.adamantcheese.chan.core.site.SiteSetting.Type.OPTIONS;
+import static com.github.adamantcheese.chan.core.site.common.CommonDataStructs.CaptchaType.CUSTOM;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getPreferences;
 
 public class Chan4
@@ -82,7 +86,7 @@ public class Chan4
 
         @Override
         public boolean matchesMediaHost(@NonNull HttpUrl url) {
-            return SiteBase.containsMediaHostUrl(url, mediaHosts);
+            return SiteUrlHandler.containsMediaHostUrl(url, mediaHosts);
         }
 
         @Override
@@ -159,14 +163,14 @@ public class Chan4
         }
     };
 
-    private final SiteEndpoints endpoints = new SiteEndpoints() {
-        private final HttpUrl a = new HttpUrl.Builder().scheme("https").host("a.4cdn.org").build();
-        private final HttpUrl i = new HttpUrl.Builder().scheme("https").host("i.4cdn.org").build();
-        private final HttpUrl t = new HttpUrl.Builder().scheme("https").host("i.4cdn.org").build();
-        private final HttpUrl s = new HttpUrl.Builder().scheme("https").host("s.4cdn.org").build();
-        private final HttpUrl sys = new HttpUrl.Builder().scheme("https").host("sys.4chan.org").build();
-        private final HttpUrl b = new HttpUrl.Builder().scheme("https").host("boards.4chan.org").build();
+    private final HttpUrl a = new HttpUrl.Builder().scheme("https").host("a.4cdn.org").build();
+    private final HttpUrl i = new HttpUrl.Builder().scheme("https").host("i.4cdn.org").build();
+    private final HttpUrl t = new HttpUrl.Builder().scheme("https").host("i.4cdn.org").build();
+    private final HttpUrl s = new HttpUrl.Builder().scheme("https").host("s.4cdn.org").build();
+    private final HttpUrl sys = new HttpUrl.Builder().scheme("https").host("sys.4chan.org").build();
+    private final HttpUrl b = new HttpUrl.Builder().scheme("https").host("boards.4chan.org").build();
 
+    private final SiteEndpoints endpoints = new SiteEndpoints() {
         @Override
         public HttpUrl catalog(Board board) {
             return a.newBuilder().addPathSegment(board.code).addPathSegment("catalog.json").build();
@@ -207,25 +211,73 @@ public class Chan4
         }
 
         @Override
-        public HttpUrl icon(String icon, Map<String, String> arg) {
-            HttpUrl.Builder b = s.newBuilder().addPathSegment("image");
+        public Pair<HttpUrl, PassthroughBitmapResult> icon(ICON_TYPE icon, Map<String, String> arg) {
+            HttpUrl.Builder iconBuilder = s.newBuilder().addPathSegment("image");
 
             switch (icon) {
-                case "country":
-                    b.addPathSegment("country");
-                    b.addPathSegment(arg.get("country_code").toLowerCase(Locale.ENGLISH) + ".gif");
+                case COUNTRY_FLAG:
+                    iconBuilder.addPathSegment("country");
+                    iconBuilder.addPathSegment(arg.get("country_code").toLowerCase(Locale.ENGLISH) + ".gif");
                     break;
-                case "troll_country":
-                    b.addPathSegment("country");
-                    b.addPathSegment("troll");
-                    b.addPathSegment(arg.get("troll_country_code").toLowerCase(Locale.ENGLISH) + ".gif");
-                    break;
-                case "since4pass":
-                    b.addPathSegment("minileaf.gif");
+                case BOARD_FLAG:
+                    String boardCode = arg.get("board_code").toLowerCase(Locale.ENGLISH);
+                    String boardFlagCode = arg.get("board_flag_code").toLowerCase(Locale.ENGLISH);
+
+                    iconBuilder.addPathSegment("flags");
+                    iconBuilder.addPathSegment(boardCode);
+
+                    if (spriteSetting.get()) {
+                        // note: this is bad, but once this is cached it never makes a network request and is fine afterwards
+                        try {
+                            Response flagAlignments = NetUtils.applicationClient.newCall(new Request.Builder().url(
+                                    "https://s.4cdn.org/image/flags/" + boardCode + "/flags.css").build()).execute();
+
+                            String alignmentsString;
+                            try {
+                                alignmentsString = flagAlignments.body().string();
+                            } catch (Exception e) {
+                                alignmentsString = "";
+                            }
+                            // for some reason, sometimes the css is returned with line separators; this deals with that weirdness
+                            Pattern dimsPattern = Pattern.compile(
+                                    "\\.bfl[\\s\\S ]*?\\{[\\s\\S ]*?width:.*?(\\d+)px;[\\s\\S ]*?height:.*?(\\d+)px;[\\s\\S ]*?\\}");
+                            Matcher dimMatcher = dimsPattern.matcher(alignmentsString);
+                            dimMatcher.find();
+
+                            Pair<Integer, Integer> dims = new Pair<>(Math.abs(Integer.parseInt(dimMatcher.group(1))),
+                                    Math.abs(Integer.parseInt(dimMatcher.group(2)))
+                            );
+
+                            Pattern flagPattern = Pattern.compile(
+                                    "\\.bfl-" + boardFlagCode
+                                            + "[\\s\\S ]*?\\{[\\s\\S ]*?background-position:.*?(\\d+)(?:px)? .*?(\\d+)(?:px)?[\\s\\S ]*?\\}",
+                                    Pattern.CASE_INSENSITIVE
+                            );
+                            Matcher flagMatcher = flagPattern.matcher(alignmentsString);
+                            flagMatcher.find();
+
+                            Pair<Integer, Integer> origin = new Pair<>(Math.abs(Integer.parseInt(flagMatcher.group(1))),
+                                    Math.abs(Integer.parseInt(flagMatcher.group(2)))
+                            );
+                            return new Pair<>(iconBuilder.addPathSegment("flags.png")
+                                    .encodedFragment(flagMatcher.group())
+                                    .build(), new NetUtilsClasses.CroppingBitmapResult(origin, dims));
+                        } catch (Exception e) {
+                            return new Pair<>(iconBuilder.addPathSegment(boardFlagCode + ".gif").build(),
+                                    new PassthroughBitmapResult()
+                            );
+                        }
+                    } else {
+                        return new Pair<>(iconBuilder.addPathSegment(boardFlagCode + ".gif").build(),
+                                new PassthroughBitmapResult()
+                        );
+                    }
+                case SINCE4PASS:
+                    iconBuilder.addPathSegment("minileaf.gif");
                     break;
             }
 
-            return b.build();
+            return new Pair<>(iconBuilder.build(), new PassthroughBitmapResult());
         }
 
         @Override
@@ -269,110 +321,59 @@ public class Chan4
         }
     };
 
-    private final CommonCallModifier siteCallModifier = new CommonCallModifier() {
-        @Override
-        public void modifyHttpCall(HttpCall httpCall, Request.Builder requestBuilder) {
-            if (actions.isLoggedIn()) {
-                requestBuilder.addHeader("Cookie", "pass_id=" + passToken.get());
-            }
-        }
-
-        @Override
-        public void modifyWebView(WebView webView) {
-            final HttpUrl sys = new HttpUrl.Builder().scheme("https").host("sys.4chan.org").build();
-
-            CookieManager cookieManager = CookieManager.getInstance();
-            cookieManager.removeAllCookies(null);
-            if (actions.isLoggedIn()) {
-                String[] passCookies = {"pass_enabled=1;", "pass_id=" + passToken.get() + ";"};
-                String domain = sys.scheme() + "://" + sys.host() + "/";
-                for (String cookie : passCookies) {
-                    cookieManager.setCookie(domain, cookie);
-                }
-            }
-        }
-    };
-
     private final SiteActions actions = new SiteActions() {
         @Override
-        public void boards(final BoardsListener listener) {
-            NetUtils.makeJsonRequest(endpoints.boards(), new ResponseResult<Boards>() {
-                @Override
-                public void onFailure(Exception e) {
-                    Logger.e(Chan4.this, "Failed to get boards from server", e);
-                    listener.onBoardsReceived(new Boards());
-                }
-
-                @Override
-                public void onSuccess(Boards result) {
-                    listener.onBoardsReceived(result);
-                }
-            }, new Chan4BoardsRequest(Chan4.this));
+        public void boards(final ResponseResult<Boards> listener) {
+            NetUtils.makeJsonRequest(endpoints.boards(),
+                    listener,
+                    new Chan4BoardsRequest(Chan4.this),
+                    NetUtilsClasses.ONE_DAY_CACHE
+            );
         }
 
         @Override
-        public void pages(Board board, PagesListener listener) {
+        public void pages(Board board, ResponseResult<ChanPages> listener) {
             NetUtils.makeJsonRequest(endpoints().pages(board), new ResponseResult<ChanPages>() {
                 @Override
                 public void onFailure(Exception e) {
                     Logger.e(Chan4.this, "Failed to get pages for board " + board.code, e);
-                    listener.onPagesReceived(board, new ChanPages());
+                    listener.onSuccess(new ChanPages());
                 }
 
                 @Override
                 public void onSuccess(ChanPages result) {
-                    listener.onPagesReceived(board, result);
+                    listener.onSuccess(result);
                 }
-            }, new Chan4PagesParser());
+            }, new Chan4PagesParser(), NetUtilsClasses.NO_CACHE);
         }
 
         @Override
-        public void archive(Board board, ArchiveListener archiveListener) {
-            NetUtils.makeHTMLRequest(endpoints().archive(board), new ResponseResult<InternalSiteArchive>() {
-                @Override
-                public void onFailure(Exception e) {
-                    BackgroundUtils.runOnMainThread(archiveListener::onArchiveError);
-                }
+        public void archive(Board board, ResponseResult<InternalSiteArchive> archiveListener) {
+            NetUtils.makeHTMLRequest(endpoints().archive(board),
+                    new MainThreadResponseResult<>(archiveListener),
+                    response -> {
+                        List<InternalSiteArchive.ArchiveItem> items = new ArrayList<>();
 
-                @Override
-                public void onSuccess(InternalSiteArchive result) {
-                    BackgroundUtils.runOnMainThread(() -> archiveListener.onArchive(result));
-                }
-            }, new HTMLProcessor<InternalSiteArchive>() {
-                @Override
-                public InternalSiteArchive process(Document response) {
-                    List<InternalSiteArchive.ArchiveItem> items = new ArrayList<>();
+                        Element table = response.getElementById("arc-list");
+                        Element tableBody = table.getElementsByTag("tbody").first();
+                        Elements trs = tableBody.getElementsByTag("tr");
+                        for (Element tr : trs) {
+                            Elements dataElements = tr.getElementsByTag("td");
+                            String description = dataElements.get(1).text();
+                            int id = Integer.parseInt(dataElements.get(0).text());
+                            items.add(InternalSiteArchive.ArchiveItem.fromDescriptionId(description, id));
+                        }
 
-                    Element table = response.getElementById("arc-list");
-                    Element tableBody = table.getElementsByTag("tbody").first();
-                    Elements trs = tableBody.getElementsByTag("tr");
-                    for (Element tr : trs) {
-                        Elements dataElements = tr.getElementsByTag("td");
-                        String description = dataElements.get(1).text();
-                        int id = Integer.parseInt(dataElements.get(0).text());
-                        items.add(InternalSiteArchive.ArchiveItem.fromDescriptionId(description, id));
-                    }
-
-                    return InternalSiteArchive.fromItems(items);
-                }
-            });
+                        return InternalSiteArchive.fromItems(items);
+                    },
+                    NetUtilsClasses.NO_CACHE
+            );
         }
 
         @Override
         public void post(Loadable loadableWithDraft, final PostListener postListener) {
-            NetUtils.makeHttpCall(new Chan4ReplyCall(loadableWithDraft),
-                    new HttpCall.HttpCallback<CommonReplyHttpCall>() {
-                        @Override
-                        public void onHttpSuccess(CommonReplyHttpCall httpPost) {
-                            postListener.onPostComplete(httpPost.replyResponse);
-                        }
-
-                        @Override
-                        public void onHttpFail(CommonReplyHttpCall httpPost, Exception e) {
-                            postListener.onPostError(e);
-                        }
-                    },
-                    postListener::onUploadingProgress
+            NetUtils.makeHttpCall(new Chan4ReplyCall(new MainThreadResponseResult<>(postListener), loadableWithDraft),
+                    postListener
             );
         }
 
@@ -382,16 +383,24 @@ public class Chan4
         }
 
         @Override
-        public SiteAuthentication postAuthenticate() {
+        public SiteAuthentication postAuthenticate(Loadable loadableWithDraft) {
             final String CAPTCHA_KEY = "6Ldp2bsSAAAAAAJ5uyx_lx34lJeEpTLVkP5k04qc";
             if (isLoggedIn()) {
                 return SiteAuthentication.fromNone();
             } else {
                 switch (captchaType.get()) {
                     case V2JS:
-                        return SiteAuthentication.fromCaptcha2(CAPTCHA_KEY, "https://boards.4chan.org");
+                        return SiteAuthentication.fromCaptcha2(CAPTCHA_KEY, b.toString());
                     case V2NOJS:
-                        return SiteAuthentication.fromCaptcha2nojs(CAPTCHA_KEY, "https://boards.4chan.org");
+                        return SiteAuthentication.fromCaptcha2nojs(CAPTCHA_KEY, b.toString());
+                    case CUSTOM:
+                        HttpUrl.Builder urlBuilder = sys.newBuilder()
+                                .addPathSegment("captcha")
+                                .addQueryParameter("board", loadableWithDraft.board.code);
+                        if (loadableWithDraft.isThreadMode()) {
+                            urlBuilder.addQueryParameter("thread_id", String.valueOf(loadableWithDraft.no));
+                        }
+                        return SiteAuthentication.fromCustomJson(urlBuilder.build().toString());
                     default:
                         throw new IllegalArgumentException();
                 }
@@ -399,78 +408,55 @@ public class Chan4
         }
 
         @Override
-        public void delete(DeleteRequest deleteRequest, final DeleteListener deleteListener) {
-            NetUtils.makeHttpCall(new Chan4DeleteHttpCall(Chan4.this, deleteRequest),
-                    new HttpCall.HttpCallback<Chan4DeleteHttpCall>() {
-                        @Override
-                        public void onHttpSuccess(Chan4DeleteHttpCall httpPost) {
-                            deleteListener.onDeleteComplete(httpPost.deleteResponse);
-                        }
-
-                        @Override
-                        public void onHttpFail(Chan4DeleteHttpCall httpPost, Exception e) {
-                            deleteListener.onDeleteError(e);
-                        }
-                    }
-            );
+        public void delete(DeleteRequest deleteRequest, final ResponseResult<DeleteResponse> deleteListener) {
+            NetUtils.makeHttpCall(new Chan4DeleteHttpCall(new MainThreadResponseResult<>(deleteListener),
+                    deleteRequest
+            ));
         }
 
         @Override
-        public void login(LoginRequest loginRequest, final LoginListener loginListener) {
+        public void login(LoginRequest loginRequest, final ResponseResult<LoginResponse> loginListener) {
             passUser.set(loginRequest.user);
             passPass.set(loginRequest.pass);
 
-            NetUtils.makeHttpCall(new Chan4PassHttpCall(Chan4.this, loginRequest),
-                    new HttpCall.HttpCallback<Chan4PassHttpCall>() {
-                        @Override
-                        public void onHttpSuccess(Chan4PassHttpCall httpCall) {
-                            LoginResponse loginResponse = httpCall.loginResponse;
-                            if (loginResponse.success) {
-                                passToken.set(loginResponse.token);
-                            }
-                            loginListener.onLoginComplete(loginResponse);
-                        }
-
-                        @Override
-                        public void onHttpFail(Chan4PassHttpCall httpCall, Exception e) {
-                            loginListener.onLoginError(e);
-                        }
-                    }
-            );
+            NetUtils.makeHttpCall(new Chan4PassHttpCall(new MainThreadResponseResult<>(loginListener), loginRequest));
         }
 
         @Override
-        public void logout() {
-            passToken.set("");
+        public void logout(final ResponseResult<LoginResponse> loginListener) {
+            NetUtils.makeHttpCall(new Chan4PassHttpCall(new MainThreadResponseResult<>(loginListener),
+                    new LoginRequest(Chan4.this, "", "", false)
+            ));
         }
 
         @Override
         public boolean isLoggedIn() {
-            return !passToken.get().isEmpty();
+            for (Cookie cookie : NetUtils.applicationClient.cookieJar().loadForRequest(sys)) {
+                if (cookie.name().equals("pass_id") && !cookie.value().isEmpty()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override
         public LoginRequest getLoginDetails() {
-            return new LoginRequest(passUser.get(), passPass.get());
+            return new LoginRequest(Chan4.this, passUser.get(), passPass.get(), true);
         }
     };
 
     // Legacy settings that were global before
     private final StringSetting passUser;
     private final StringSetting passPass;
-    private final StringSetting passToken;
 
-    private OptionsSetting<CaptchaType> captchaType;
-    public static StringSetting flagType;
+    public static OptionsSetting<CaptchaType> captchaType;
+    private BooleanSetting spriteSetting;
 
     public Chan4() {
         // we used these before multisite, and lets keep using them.
         SettingProvider<Object> p = new SharedPreferencesSettingProvider(getPreferences());
         passUser = new StringSetting(p, "preference_pass_token", "");
         passPass = new StringSetting(p, "preference_pass_pin", "");
-        // token was renamed, before it meant the username, now it means the token returned
-        // from the server that the cookie is set to.
-        passToken = new StringSetting(p, "preference_pass_id", "");
         icon().get(icon -> {});
     }
 
@@ -479,17 +465,19 @@ public class Chan4
         super.initializeSettings();
 
         captchaType =
-                new OptionsSetting<>(settingsProvider, "preference_captcha_type_chan4", CaptchaType.class, V2NOJS);
-        flagType = new StringSetting(settingsProvider, "preference_flag_chan4", "0");
+                new OptionsSetting<>(settingsProvider, "preference_captcha_type_chan4", CaptchaType.class, CUSTOM);
+        spriteSetting = new BooleanSetting(settingsProvider, "preference_sprite_map_chan4", false);
     }
 
     @Override
     public List<SiteSetting<?>> settings() {
         List<SiteSetting<?>> settings = new ArrayList<>();
         SiteSetting<?> captchaSetting =
-                new SiteSetting<>("Captcha type", captchaType, Arrays.asList("Javascript", "Noscript"));
+                new SiteSetting<>("Captcha type", OPTIONS, captchaType, Arrays.asList("Javascript", "Noscript", "4chan Custom"));
+        SiteSetting<?> spriteMapSetting =
+                new SiteSetting<>("Use sprite maps for board flags", BOOLEAN, spriteSetting, Collections.emptyList());
         settings.add(captchaSetting);
-        settings.add(new SiteSetting<>("Country flag code", flagType, null));
+        settings.add(spriteMapSetting);
         return settings;
     }
 
@@ -531,7 +519,11 @@ public class Chan4
                 // depends if the board supports it.
                 return board.spoilers;
             case ARCHIVE:
+                // only some boards have local archives
                 return board.archive;
+            case FORCED_ANONYMOUS:
+                // some boards (like /b/) disable the name field
+                return board.forcedAnon;
             default:
                 return false;
         }
@@ -540,11 +532,6 @@ public class Chan4
     @Override
     public SiteEndpoints endpoints() {
         return endpoints;
-    }
-
-    @Override
-    public CommonCallModifier callModifier() {
-        return siteCallModifier;
     }
 
     @Override
@@ -558,16 +545,5 @@ public class Chan4
     @Override
     public SiteActions actions() {
         return actions;
-    }
-
-    @NonNull
-    @Override
-    public ChunkDownloaderSiteProperties getChunkDownloaderSiteProperties() {
-        // For preloading in ImageViewerPresenter, a max of 3 images are set to preload
-        // https://developers.cloudflare.com/workers/platform/limits#simultaneous-open-connections seems to be true for any
-        // Cloudflare connection; it prevents more than 6 concurrent connections to its resources, so we shouldn't connect more than that
-        // Or at least minimize that count; fast downloads will reduce the count, but this is just insurance
-        // 3 * chunks <= 6 then, so 2 max chunks per download
-        return new ChunkDownloaderSiteProperties(2, true);
     }
 }

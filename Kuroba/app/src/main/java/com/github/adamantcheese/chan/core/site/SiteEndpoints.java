@@ -17,10 +17,12 @@
 package com.github.adamantcheese.chan.core.site;
 
 import androidx.collection.ArrayMap;
+import androidx.core.util.Pair;
 
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.PassthroughBitmapResult;
 
 import java.util.Map;
 
@@ -39,7 +41,14 @@ public interface SiteEndpoints {
 
     HttpUrl thumbnailUrl(Post.Builder post, boolean spoiler, Map<String, String> arg);
 
-    HttpUrl icon(String icon, Map<String, String> arg);
+    enum ICON_TYPE {
+        COUNTRY_FLAG,
+        BOARD_FLAG,
+        SINCE4PASS,
+        OTHER
+    }
+
+    Pair<HttpUrl, PassthroughBitmapResult> icon(ICON_TYPE icon, Map<String, String> arg);
 
     HttpUrl boards();
 

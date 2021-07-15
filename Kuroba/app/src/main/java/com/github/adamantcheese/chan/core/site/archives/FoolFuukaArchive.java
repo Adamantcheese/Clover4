@@ -4,10 +4,14 @@ import android.text.TextUtils;
 import android.util.JsonReader;
 import android.util.JsonToken;
 
+import androidx.annotation.NonNull;
+
 import com.github.adamantcheese.chan.BuildConfig;
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.PostImage;
+import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.common.DefaultPostParser;
 import com.github.adamantcheese.chan.core.site.parser.ChanReaderProcessingQueue;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser;
@@ -15,7 +19,7 @@ import com.github.adamantcheese.chan.core.site.parser.CommentParser.ResolveLink;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser.ThreadLink;
 import com.github.adamantcheese.chan.core.site.parser.PostParser;
 import com.github.adamantcheese.chan.ui.theme.Theme;
-import com.github.adamantcheese.chan.utils.StringUtils;
+import com.google.common.io.Files;
 
 import org.jsoup.nodes.Element;
 
@@ -25,6 +29,9 @@ import java.util.regex.Pattern;
 
 import okhttp3.HttpUrl;
 
+/**
+ * A site that uses FoolFuuka as the backend.
+ */
 public class FoolFuukaArchive
         extends ExternalSiteArchive {
 
@@ -60,13 +67,17 @@ public class FoolFuukaArchive
             // OP object
             readPostObject(reader, queue);
 
-            reader.nextName(); // posts object
-            reader.beginObject();
-            // Posts object
-            while (reader.hasNext()) {
-                readPostObject(reader, queue);
+            // in the event of only an OP, the regular posts section is not there
+            if (reader.peek() != JsonToken.END_OBJECT) {
+                reader.nextName(); // posts object
+                reader.beginObject();
+                // Posts object
+                while (reader.hasNext()) {
+                    readPostObject(reader, queue);
+                }
+                reader.endObject();
             }
-            reader.endObject();
+
             reader.endObject();
             reader.endObject();
         }
@@ -165,8 +176,8 @@ public class FoolFuukaArchive
                                     break;
                                 case "media_filename":
                                     String filename = reader.nextString();
-                                    imageBuilder.filename(StringUtils.removeExtensionFromFileName(filename));
-                                    imageBuilder.extension(StringUtils.extractFileNameExtension(filename));
+                                    imageBuilder.filename(Files.getNameWithoutExtension(filename));
+                                    imageBuilder.extension(Files.getFileExtension(filename));
                                     break;
                                 case "media_hash":
                                     imageBuilder.fileHash(reader.nextString(), true);
@@ -197,7 +208,7 @@ public class FoolFuukaArchive
                                     }
                                     break;
                                 case "media_orig":
-                                    imageBuilder.serverFilename(StringUtils.removeExtensionFromFileName(reader.nextString()));
+                                    imageBuilder.serverFilename(Files.getNameWithoutExtension(reader.nextString()));
                                     break;
                                 case "thumb_link":
                                     if (reader.peek() == JsonToken.NULL) {
@@ -246,21 +257,19 @@ public class FoolFuukaArchive
         @Override
         public CharSequence handleTag(
                 PostParser.Callback callback,
-                Theme theme,
+                @NonNull Theme theme,
                 Post.Builder post,
                 String tag,
                 CharSequence text,
                 Element element
         ) {
-            // for some reason, stuff is wrapped in a "greentext" span if it starts with a >, so we want to handle the inner element directly if there are any
+            // for some reason, stuff is wrapped in a "greentext" span if it starts with a > regardless of it is greentext or not
+            // the default post parser has already handled any inner tags by the time that it has gotten to this case, since
+            // deepest nodes are processed first
+            // in this case, we just want to return the text that has already been processed inside of this "greentext" node
+            // otherwise duplicate PostLinkables will be generated
             if (element.getElementsByTag("span").hasClass("greentext") && element.childrenSize() > 0) {
-                return super.handleTag(callback,
-                        theme,
-                        post,
-                        element.children().first().tagName(),
-                        text,
-                        element.children().first()
-                );
+                return text;
             }
             return super.handleTag(callback, theme, post, tag, text, element);
         }
@@ -283,6 +292,46 @@ public class FoolFuukaArchive
                 } else {
                     return "https://" + domain + "/" + loadable.boardCode;
                 }
+            }
+
+            @Override
+            public Loadable resolveLoadable(Site site, HttpUrl url) {
+                List<String> parts = url.pathSegments();
+
+                if (!parts.isEmpty()) {
+                    String boardCode = parts.get(0);
+                    Board board = site.board(boardCode);
+                    if (board != null) {
+                        if (parts.size() == 1) {
+                            // Board mode
+                            return Loadable.forCatalog(board);
+                        } else {
+                            // Thread mode
+                            int no = -1;
+                            try {
+                                no = Integer.parseInt(parts.get(2));
+                            } catch (Exception ignored) {
+                            }
+
+                            int post = -1;
+                            try {
+                                post = Integer.parseInt(url.fragment());
+                            } catch (Exception ignored) {
+                            }
+
+                            if (no >= 0) {
+                                Loadable loadable = Loadable.forThread(board, no, "", false);
+                                if (post >= 0) {
+                                    loadable.markedNo = post;
+                                }
+
+                                return loadable;
+                            }
+                        }
+                    }
+                }
+
+                return null;
             }
 
             @Override

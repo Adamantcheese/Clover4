@@ -28,8 +28,6 @@ import com.github.adamantcheese.chan.core.database.DatabaseSiteManager;
 import com.github.adamantcheese.chan.core.repository.SiteRepository;
 import com.github.adamantcheese.chan.core.saver.ImageSaver;
 import com.github.adamantcheese.chan.core.site.SiteResolver;
-import com.github.adamantcheese.chan.features.gesture_editor.Android10GesturesExclusionZonesHolder;
-import com.github.adamantcheese.chan.ui.captcha.CaptchaHolder;
 import com.github.adamantcheese.chan.ui.settings.SavedFilesBaseDirectory;
 import com.github.adamantcheese.chan.utils.Logger;
 import com.github.k1rakishou.fsaf.BadPathSymbolResolutionStrategy;
@@ -37,6 +35,7 @@ import com.github.k1rakishou.fsaf.FileChooser;
 import com.github.k1rakishou.fsaf.FileManager;
 import com.github.k1rakishou.fsaf.manager.base_directory.DirectoryManager;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 
 import org.codejargon.feather.Provides;
 
@@ -45,13 +44,13 @@ import java.io.File;
 import javax.inject.Singleton;
 
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppContext;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getMaxScreenSize;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getMinScreenSize;
 import static com.github.k1rakishou.fsaf.BadPathSymbolResolutionStrategy.ReplaceBadSymbols;
 import static com.github.k1rakishou.fsaf.BadPathSymbolResolutionStrategy.ThrowAnException;
 
 public class AppModule {
     public static final String DI_TAG = "Dependency Injection";
+
+    public static final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     @Provides
     @Singleton
@@ -129,20 +128,6 @@ public class AppModule {
 
     @Provides
     @Singleton
-    public CaptchaHolder provideCaptchaHolder() {
-        Logger.d(DI_TAG, "Captcha holder");
-        return new CaptchaHolder();
-    }
-
-    @Provides
-    @Singleton
-    public Gson provideGson() {
-        Logger.d(AppModule.DI_TAG, "Gson module");
-        return new Gson();
-    }
-
-    @Provides
-    @Singleton
     public FileManager provideFileManager() {
         DirectoryManager directoryManager = new DirectoryManager(getAppContext());
 
@@ -162,21 +147,10 @@ public class AppModule {
     }
 
     public static File getCacheDir() {
-        //TODO maybe it's best to just return the internal cache dir
-
-        // See also res/xml/filepaths.xml for the fileprovider.
-        if (getAppContext().getExternalCacheDir() != null) {
-            return getAppContext().getExternalCacheDir();
-        } else {
-            return getAppContext().getCacheDir();
+        File cacheDir = getAppContext().getCacheDir();
+        if (!cacheDir.exists() && !cacheDir.mkdirs()) {
+            Logger.e("AppModule", "cache dir creation failed, this may fail catastrophically!");
         }
-    }
-
-    @Provides
-    @Singleton
-    public Android10GesturesExclusionZonesHolder provideAndroid10GesturesHolder(Gson gson) {
-        Logger.d(DI_TAG, "Android10GesturesExclusionZonesHolder");
-
-        return new Android10GesturesExclusionZonesHolder(gson, getMinScreenSize(), getMaxScreenSize());
+        return cacheDir;
     }
 }

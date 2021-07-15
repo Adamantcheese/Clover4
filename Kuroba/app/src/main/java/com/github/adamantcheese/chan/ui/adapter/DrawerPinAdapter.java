@@ -35,11 +35,11 @@ import com.github.adamantcheese.chan.core.manager.WatchManager;
 import com.github.adamantcheese.chan.core.model.orm.Pin;
 import com.github.adamantcheese.chan.core.repository.BitmapRepository;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
-import com.github.adamantcheese.chan.ui.helper.BoardHelper;
 import com.github.adamantcheese.chan.ui.helper.PostHelper;
 import com.github.adamantcheese.chan.ui.layout.SearchLayout;
 import com.github.adamantcheese.chan.ui.theme.ThemeHelper;
 import com.github.adamantcheese.chan.ui.view.ThumbnailView;
+import com.github.adamantcheese.chan.utils.StringUtils;
 
 import javax.inject.Inject;
 
@@ -48,7 +48,6 @@ import static android.view.View.VISIBLE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static com.github.adamantcheese.chan.Chan.inject;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.dp;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrColor;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrDrawable;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getColor;
@@ -87,7 +86,7 @@ public class DrawerPinAdapter
             pin = watchManager.getAllPins().get(position);
         }
 
-        if (!pin.loadable.title.toLowerCase().contains(searchQuery.toLowerCase())) {
+        if (!StringUtils.containsIgnoreCase(pin.loadable.title, searchQuery)) {
             holder.itemView.setVisibility(View.GONE);
             ViewGroup.LayoutParams oldParams = holder.itemView.getLayoutParams();
             oldParams.height = 0;
@@ -100,16 +99,16 @@ public class DrawerPinAdapter
             holder.itemView.getLayoutParams().height = WRAP_CONTENT;
         }
 
-        holder.title.setText(applySearchSpans(pin.loadable.title, searchQuery));
+        holder.title.setText(applySearchSpans(ThemeHelper.getTheme(), pin.loadable.title, searchQuery));
 
-        holder.image.setUrl(pin.loadable.thumbnailUrl, dp(48), dp(48));
+        holder.image.setUrl(pin.loadable.thumbnailUrl, holder.image.getLayoutParams().height);
         holder.image.setGreyscale(!pin.watching);
 
         WatchManager.PinWatcher pinWatcher = watchManager.getPinWatcher(pin);
         if (pinWatcher != null) {
             CharSequence summary = pinWatcher.getSummary();
             if (summary == null) {
-                summary = new SpannableStringBuilder(BoardHelper.getName(pin.loadable.board));
+                summary = new SpannableStringBuilder(pin.loadable.board.getFormattedName());
             } else {
                 summary = new SpannableStringBuilder("/" + pin.loadable.boardCode + "/ - " + summary);
             }
@@ -156,7 +155,7 @@ public class DrawerPinAdapter
     @Override
     public void onViewRecycled(@NonNull PinViewHolder holder) {
         holder.image.setGreyscale(false);
-        holder.image.setUrl(null, 0, 0);
+        holder.image.setUrl(null, 0);
         holder.watchCountText.setText("");
         holder.title.setText("");
         holder.threadInfo.setText("");
@@ -172,7 +171,7 @@ public class DrawerPinAdapter
     @Override
     public long getItemId(int position) {
         synchronized (watchManager.getAllPins()) {
-            return watchManager.getAllPins().get(position).id + 10;
+            return watchManager.getAllPins().get(position).loadable.no;
         }
     }
 
@@ -209,7 +208,6 @@ public class DrawerPinAdapter
         private PinViewHolder(View itemView) {
             super(itemView);
             image = itemView.findViewById(R.id.thumb);
-            image.setCircular(true);
             title = itemView.findViewById(R.id.title);
             title.setTypeface(ThemeHelper.getTheme().mainFont);
             threadInfo = itemView.findViewById(R.id.thread_info);

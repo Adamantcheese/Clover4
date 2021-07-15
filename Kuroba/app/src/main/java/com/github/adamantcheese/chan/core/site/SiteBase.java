@@ -16,11 +16,11 @@
  */
 package com.github.adamantcheese.chan.core.site;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.github.adamantcheese.chan.core.manager.BoardManager;
 import com.github.adamantcheese.chan.core.model.orm.Board;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.NoFailResponseResult;
 import com.github.adamantcheese.chan.core.repository.SiteRepository;
 import com.github.adamantcheese.chan.core.settings.primitives.JsonSettings;
 import com.github.adamantcheese.chan.core.settings.provider.JsonSettingsProvider;
@@ -39,6 +39,9 @@ import static com.github.adamantcheese.chan.Chan.inject;
 
 public abstract class SiteBase
         implements Site {
+    /**
+     * This is the database ID of the site!
+     */
     protected int id;
 
     @Inject
@@ -53,12 +56,12 @@ public abstract class SiteBase
 
     @Override
     public void initialize(int id, JsonSettings userSettings) {
+        if (initialized) {
+            throw new IllegalStateException("Cannot initialize more than once!");
+        }
+
         this.id = id;
         this.userSettings = userSettings;
-
-        if (initialized) {
-            throw new IllegalStateException();
-        }
         initialized = true;
     }
 
@@ -72,7 +75,9 @@ public abstract class SiteBase
         initializeSettings();
 
         if (boardsType().canList) {
-            actions().boards(boards -> boardManager.updateAvailableBoardsForSite(this, boards));
+            actions().boards((NoFailResponseResult<Boards>) result -> boardManager.updateAvailableBoardsForSite(SiteBase.this,
+                    result
+            ));
         }
     }
 
@@ -94,13 +99,6 @@ public abstract class SiteBase
     public void initializeSettings() {
     }
 
-    @NonNull
-    @Override
-    public ChunkDownloaderSiteProperties getChunkDownloaderSiteProperties() {
-        // by default, assume everything is bad
-        return new ChunkDownloaderSiteProperties(Integer.MAX_VALUE, false);
-    }
-
     @Override
     public Board createBoard(String name, String code) {
         Board existing = board(code);
@@ -111,22 +109,6 @@ public abstract class SiteBase
         Board board = Board.fromSiteNameCode(this, name, code);
         boardManager.updateAvailableBoardsForSite(this, new Boards(Collections.singletonList(board)));
         return board;
-    }
-
-    public static boolean containsMediaHostUrl(HttpUrl desiredSiteUrl, String[] mediaHosts) {
-        String host = desiredSiteUrl.host();
-
-        for (String mediaHost : mediaHosts) {
-            if (host.equals(mediaHost)) {
-                return true;
-            }
-
-            if (host.equals("www." + mediaHost)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     @Override

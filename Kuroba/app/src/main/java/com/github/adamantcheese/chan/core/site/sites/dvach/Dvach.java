@@ -4,6 +4,7 @@ import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.net.NetUtils;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
 import com.github.adamantcheese.chan.core.net.NetUtilsClasses.ResponseResult;
 import com.github.adamantcheese.chan.core.settings.primitives.OptionsSetting;
 import com.github.adamantcheese.chan.core.site.SiteAuthentication;
@@ -11,13 +12,11 @@ import com.github.adamantcheese.chan.core.site.SiteIcon;
 import com.github.adamantcheese.chan.core.site.SiteSetting;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.Boards;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.CaptchaType;
-import com.github.adamantcheese.chan.core.site.common.CommonReplyHttpCall;
 import com.github.adamantcheese.chan.core.site.common.CommonSite;
 import com.github.adamantcheese.chan.core.site.common.MultipartHttpCall;
 import com.github.adamantcheese.chan.core.site.common.vichan.VichanActions;
 import com.github.adamantcheese.chan.core.site.common.vichan.VichanEndpoints;
-import com.github.adamantcheese.chan.core.site.http.DeleteRequest;
-import com.github.adamantcheese.chan.core.site.http.HttpCall.HttpCallback;
+import com.github.adamantcheese.chan.core.site.http.ReplyResponse;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser;
 import com.github.adamantcheese.chan.utils.Logger;
 
@@ -29,6 +28,7 @@ import java.util.Map;
 
 import okhttp3.HttpUrl;
 
+import static com.github.adamantcheese.chan.core.site.SiteSetting.Type.OPTIONS;
 import static com.github.adamantcheese.chan.core.site.common.CommonDataStructs.CaptchaType.V2JS;
 
 public class Dvach
@@ -79,7 +79,7 @@ public class Dvach
     public List<SiteSetting<?>> settings() {
         List<SiteSetting<?>> settings = new ArrayList<>();
         SiteSetting<?> captchaSetting =
-                new SiteSetting<>("Captcha type", captchaType, Arrays.asList("Javascript", "Noscript"));
+                new SiteSetting<>("Captcha type", OPTIONS, captchaType, Arrays.asList("Javascript", "Noscript", null));
         settings.add(captchaSetting);
         return settings;
     }
@@ -137,7 +137,7 @@ public class Dvach
         setActions(new VichanActions(this) {
 
             @Override
-            public void setupPost(Loadable loadable, MultipartHttpCall call) {
+            public void setupPost(Loadable loadable, MultipartHttpCall<ReplyResponse> call) {
                 super.setupPost(loadable, call);
 
                 if (loadable.isThreadMode()) {
@@ -150,57 +150,43 @@ public class Dvach
             }
 
             @Override
-            public boolean requirePrepare() {
-                return false;
+            public void prepare(
+                    MultipartHttpCall<ReplyResponse> call, Loadable loadable, ResponseResult<Void> callback
+            ) {
+                // don't need to check antispam for this site
+                callback.onSuccess(null);
             }
 
             @Override
             public void post(Loadable loadableWithDraft, final PostListener postListener) {
-                NetUtils.makeHttpCall(new DvachReplyCall(loadableWithDraft), new HttpCallback<CommonReplyHttpCall>() {
-                    @Override
-                    public void onHttpSuccess(CommonReplyHttpCall httpPost) {
-                        postListener.onPostComplete(httpPost.replyResponse);
-                    }
-
-                    @Override
-                    public void onHttpFail(CommonReplyHttpCall httpPost, Exception e) {
-                        postListener.onPostError(e);
-                    }
-                }, postListener::onUploadingProgress);
+                NetUtils.makeHttpCall(new DvachReplyCall(new NetUtilsClasses.MainThreadResponseResult<>(postListener),
+                        loadableWithDraft
+                ), postListener);
             }
 
             @Override
             public boolean postRequiresAuthentication() {
-                return !isLoggedIn();
+                return true;
             }
 
             @Override
-            public SiteAuthentication postAuthenticate() {
-                if (isLoggedIn()) {
-                    return SiteAuthentication.fromNone();
-                } else {
-                    switch (captchaType.get()) {
-                        case V2JS:
-                            return SiteAuthentication.fromCaptcha2(CAPTCHA_KEY,
-                                    "https://2ch.hk/api/captcha/recaptcha/mobile"
-                            );
-                        case V2NOJS:
-                            return SiteAuthentication.fromCaptcha2nojs(CAPTCHA_KEY,
-                                    "https://2ch.hk/api/captcha/recaptcha/mobile"
-                            );
-                        default:
-                            throw new IllegalArgumentException();
-                    }
+            public SiteAuthentication postAuthenticate(Loadable loadableWithDraft) {
+                switch (captchaType.get()) {
+                    case V2JS:
+                        return SiteAuthentication.fromCaptcha2(CAPTCHA_KEY,
+                                "https://2ch.hk/api/captcha/recaptcha/mobile"
+                        );
+                    case V2NOJS:
+                        return SiteAuthentication.fromCaptcha2nojs(CAPTCHA_KEY,
+                                "https://2ch.hk/api/captcha/recaptcha/mobile"
+                        );
+                    default:
+                        throw new IllegalArgumentException();
                 }
             }
 
             @Override
-            public void delete(DeleteRequest deleteRequest, DeleteListener deleteListener) {
-                super.delete(deleteRequest, deleteListener);
-            }
-
-            @Override
-            public void boards(final BoardsListener listener) {
+            public void boards(final ResponseResult<Boards> listener) {
                 NetUtils.makeJsonRequest(endpoints().boards(), new ResponseResult<Boards>() {
                     @Override
                     public void onFailure(Exception e) {
@@ -216,14 +202,14 @@ public class Dvach
                                 "po"
                         ));
                         Collections.shuffle(list);
-                        listener.onBoardsReceived(list);
+                        listener.onSuccess(list);
                     }
 
                     @Override
                     public void onSuccess(Boards result) {
-                        listener.onBoardsReceived(result);
+                        listener.onSuccess(result);
                     }
-                }, new DvachBoardsParser(Dvach.this));
+                }, new DvachBoardsParser(Dvach.this), NetUtilsClasses.ONE_DAY_CACHE);
             }
         });
 

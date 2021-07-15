@@ -21,25 +21,12 @@ import android.content.Context;
 import android.content.Intent;
 
 import com.github.adamantcheese.chan.core.manager.WakeManager;
-import com.github.adamantcheese.chan.utils.Logger;
-import com.github.adamantcheese.chan.utils.StringUtils;
-
-import javax.inject.Inject;
-
-import static com.github.adamantcheese.chan.Chan.inject;
 
 public class WakeUpdateReceiver
         extends BroadcastReceiver {
-    @Inject
-    WakeManager wakeManager;
-
-    public WakeUpdateReceiver() {
-        inject(this);
-    }
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        Logger.d(this, "Alarm trigger at " + StringUtils.getCurrentTimeDefaultLocale());
-        wakeManager.onBroadcastReceived(true);
+        WakeManager.getInstance().onBroadcastReceived(true);
     }
 }

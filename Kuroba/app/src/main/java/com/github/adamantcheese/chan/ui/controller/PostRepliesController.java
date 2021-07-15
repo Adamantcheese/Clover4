@@ -127,11 +127,6 @@ public class PostRepliesController
             }
 
             @Override
-            public int getMarkedNo() {
-                return displayingData.forPostNo;
-            }
-
-            @Override
             public boolean isCompact() {
                 return false;
             }
@@ -141,21 +136,18 @@ public class PostRepliesController
                 return false;
             }
         };
-        adapter.setPostViewMode(ChanSettings.PostViewMode.LIST);
         recyclerView.setAdapter(adapter);
         adapter.setThread(new ChanThread(loadable, displayingData.posts),
                 new PostsFilter(PostsFilter.Order.BUMP, null)
         );
-        adapter.setLastSeenIndicatorPosition(-1); //disable last seen indicator inside of reply popups
+        adapter.lastSeenIndicatorPosition = Integer.MIN_VALUE; //disable last seen indicator inside of reply popups
         LinearLayoutManager layoutManager = (LinearLayoutManager) recyclerView.getLayoutManager();
-        layoutManager.scrollToPositionWithOffset(data.listViewIndex, data.listViewTop);
+        layoutManager.scrollToPositionWithOffset(data.position.index, data.position.top);
 
         recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
-                int[] indexAndTop = RecyclerUtils.getIndexAndTop(recyclerView);
-                data.listViewIndex = indexAndTop[0];
-                data.listViewTop = indexAndTop[1];
+                data.position = RecyclerUtils.getIndexAndTop(recyclerView);
             }
         });
 

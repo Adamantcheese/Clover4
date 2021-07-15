@@ -20,15 +20,19 @@ import android.annotation.SuppressLint;
 import android.content.res.AssetManager;
 import android.util.JsonReader;
 
+import androidx.annotation.NonNull;
+
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.net.NetUtils;
-import com.github.adamantcheese.chan.core.net.NetUtilsClasses.JSONProcessor;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
 import com.github.adamantcheese.chan.core.net.NetUtilsClasses.ResponseResult;
 import com.github.adamantcheese.chan.core.site.archives.AyaseArchive;
 import com.github.adamantcheese.chan.core.site.archives.ExternalSiteArchive;
 import com.github.adamantcheese.chan.core.site.archives.FoolFuukaArchive;
 import com.github.adamantcheese.chan.core.site.sites.chan4.Chan4;
 import com.github.adamantcheese.chan.utils.Logger;
+
+import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStreamReader;
 import java.util.ArrayList;
@@ -42,8 +46,8 @@ import okhttp3.HttpUrl;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppContext;
 
 public class ArchivesManager
-        extends JSONProcessor<List<ExternalSiteArchive>>
-        implements ResponseResult<List<ExternalSiteArchive>> {
+        implements NetUtilsClasses.Converter<List<ExternalSiteArchive>, JsonReader>,
+                   ResponseResult<List<ExternalSiteArchive>> {
     private List<ExternalSiteArchive> archivesList;
 
     private final Map<String, Class<? extends ExternalSiteArchive>> jsonMapping = new HashMap<>();
@@ -71,14 +75,19 @@ public class ArchivesManager
         try {
             // archives.json should only contain FoolFuuka archives, as no other proper archiving software with an API seems to exist
             try (JsonReader reader = new JsonReader(new InputStreamReader(assetManager.open("archives.json")))) {
-                archivesList = process(reader);
+                archivesList = convert(reader);
             }
         } catch (Exception e) {
             Logger.d(this, "Unable to load/parse internal archives list", e);
         }
 
-        // fresh copy request, in case of updates
-        NetUtils.makeJsonRequest(HttpUrl.get("https://4chenz.github.io/archives.json/archives.json"), this, this);
+        // fresh copy request, in case of updates (infrequent)
+        NetUtils.makeJsonRequest(
+                HttpUrl.get("https://4chenz.github.io/archives.json/archives.json"),
+                this,
+                this,
+                NetUtilsClasses.ONE_DAY_CACHE
+        );
     }
 
     public List<ExternalSiteArchive> archivesForBoard(Board b) {
@@ -95,8 +104,16 @@ public class ArchivesManager
         return result;
     }
 
+    @Nullable
+    public ExternalSiteArchive archiveForDomain(@NonNull String domain) {
+        for (ExternalSiteArchive a : archivesList) {
+            if (a.domain.contains(domain)) return a;
+        }
+        return null;
+    }
+
     @Override
-    public List<ExternalSiteArchive> process(JsonReader reader)
+    public List<ExternalSiteArchive> convert(JsonReader reader)
             throws Exception {
         List<ExternalSiteArchive> archives = new ArrayList<>();
 

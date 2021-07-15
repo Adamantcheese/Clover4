@@ -20,8 +20,6 @@ import android.content.Context;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
@@ -30,6 +28,7 @@ import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.PostImage;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
+import com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions;
 import com.github.adamantcheese.chan.ui.theme.Theme;
 import com.github.adamantcheese.chan.ui.view.FloatingMenu;
 import com.github.adamantcheese.chan.ui.view.FloatingMenuItem;
@@ -39,13 +38,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static com.github.adamantcheese.chan.utils.AndroidUtils.dp;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrColor;
 
 public class PostStubCell
         extends RelativeLayout
         implements PostCellInterface {
-    private static final int TITLE_MAX_LENGTH = 100;
-
     private Post post;
     private PostCellInterface.PostCellCallback callback;
 
@@ -68,19 +64,16 @@ public class PostStubCell
         super.onFinishInflate();
 
         title = findViewById(R.id.title);
-        ImageView options = findViewById(R.id.options);
 
-        if (!isInEditMode()) {
-            int textSizeSp = ChanSettings.fontSize.get();
-            title.setTextSize(textSizeSp);
+        int textSizeSp = isInEditMode() ? 15 : ChanSettings.fontSize.get();
+        title.setTextSize(textSizeSp);
 
-            int paddingPx = dp(textSizeSp - 6);
-            title.setPadding(paddingPx, 0, 0, 0);
-        }
+        int paddingPx = dp(getContext(), textSizeSp - 7);
+        title.setPadding(paddingPx, paddingPx, 0, paddingPx);
 
-        options.setOnClickListener(v -> {
-            List<FloatingMenuItem<Integer>> items = new ArrayList<>();
-            List<FloatingMenuItem<Integer>> extraItems = new ArrayList<>();
+        findViewById(R.id.options).setOnClickListener(v -> {
+            List<FloatingMenuItem<PostOptions>> items = new ArrayList<>();
+            List<FloatingMenuItem<PostOptions>> extraItems = new ArrayList<>();
             Object extraOption = callback.onPopulatePostOptions(post, items, extraItems);
             showOptions(v, items, extraItems, extraOption);
         });
@@ -88,14 +81,14 @@ public class PostStubCell
 
     private void showOptions(
             View anchor,
-            List<FloatingMenuItem<Integer>> items,
-            List<FloatingMenuItem<Integer>> extraItems,
+            List<FloatingMenuItem<PostOptions>> items,
+            List<FloatingMenuItem<PostOptions>> extraItems,
             Object extraOption
     ) {
-        FloatingMenu<Integer> menu = new FloatingMenu<>(getContext(), anchor, items);
-        menu.setCallback(new FloatingMenu.ClickCallback<Integer>() {
+        FloatingMenu<PostOptions> menu = new FloatingMenu<>(getContext(), anchor, items);
+        menu.setCallback(new FloatingMenu.ClickCallback<PostOptions>() {
             @Override
-            public void onFloatingMenuItemClicked(FloatingMenu<Integer> menu, FloatingMenuItem<Integer> item) {
+            public void onFloatingMenuItemClicked(FloatingMenu<PostOptions> menu, FloatingMenuItem<PostOptions> item) {
                 if (item.getId() == extraOption) {
                     showOptions(anchor, extraItems, null, null);
                 }
@@ -109,19 +102,26 @@ public class PostStubCell
     public void setPost(
             Loadable loadable,
             final Post post,
-            PostCellInterface.PostCellCallback callback,
+            PostCellCallback callback,
             boolean inPopup,
             boolean highlighted,
-            int markedNo,
-            ChanSettings.PostViewMode postViewMode,
             boolean compact,
-            String searchQuery,
             Theme theme
     ) {
         this.post = post;
         this.callback = callback;
 
-        bindPost(post, postViewMode);
+        // Spans are stripped here, to better distinguish a stub post
+        if (!TextUtils.isEmpty(post.subjectSpan)) {
+            title.setText(post.subjectSpan.toString());
+        } else {
+            title.setText(post.comment.toString());
+        }
+    }
+
+    @Override
+    public void unsetPost() {
+        post = null;
     }
 
     public Post getPost() {
@@ -135,37 +135,5 @@ public class PostStubCell
     @Override
     public boolean hasOverlappingRendering() {
         return false;
-    }
-
-    private void bindPost(Post post, ChanSettings.PostViewMode mode) {
-        if (!TextUtils.isEmpty(post.subjectSpan)) {
-            title.setText(post.subjectSpan);
-        } else {
-            CharSequence titleText;
-            if (post.comment.length() > TITLE_MAX_LENGTH) {
-                titleText = post.comment.subSequence(0, TITLE_MAX_LENGTH);
-            } else {
-                titleText = post.comment;
-            }
-            title.setText(titleText);
-        }
-
-        // These onclick listeners are overridden in PostAdapter's onBindViewHolder
-        if (mode == ChanSettings.PostViewMode.CARD) {
-            setBackgroundColor(getAttrColor(getContext(), R.attr.backcolor));
-            int dp2 = dp(getContext(), 2);
-            ((ViewGroup.MarginLayoutParams) getLayoutParams()).setMargins(dp2, dp2, dp2, dp2);
-            ((RelativeLayout.LayoutParams) title.getLayoutParams()).removeRule(RelativeLayout.CENTER_VERTICAL);
-            setElevation(dp2);
-            title.setSingleLine(false);
-            setOnClickListener(null);
-        } else {
-            setBackgroundResource(R.drawable.ripple_item_background);
-            ((ViewGroup.MarginLayoutParams) getLayoutParams()).setMargins(0, 0, 0, 0);
-            ((RelativeLayout.LayoutParams) title.getLayoutParams()).addRule(RelativeLayout.CENTER_VERTICAL);
-            setElevation(0);
-            title.setSingleLine(true);
-            setOnClickListener(v -> callback.onPostClicked(post));
-        }
     }
 }

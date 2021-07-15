@@ -16,6 +16,7 @@
  */
 package com.github.adamantcheese.chan.core.settings;
 
+import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.Uri;
 
@@ -32,10 +33,8 @@ import com.github.adamantcheese.chan.core.settings.primitives.StringSetting;
 import com.github.adamantcheese.chan.core.settings.provider.SettingProvider;
 import com.github.adamantcheese.chan.core.settings.provider.SharedPreferencesSettingProvider;
 import com.github.adamantcheese.chan.ui.adapter.PostsFilter;
-import com.github.adamantcheese.chan.ui.controller.settings.captcha.JsCaptchaCookiesJar;
 import com.github.adamantcheese.chan.ui.theme.ThemeHelper;
 import com.github.adamantcheese.chan.utils.Logger;
-import com.google.gson.Gson;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -45,7 +44,6 @@ import java.net.InetSocketAddress;
 import java.net.Proxy;
 
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppContext;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppDir;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getDimen;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getPreferences;
@@ -109,18 +107,12 @@ public class ChanSettings {
 
     public enum PostViewMode
             implements OptionSettingItem {
-        LIST("list"),
-        CARD("grid");
-
-        String name;
-
-        PostViewMode(String name) {
-            this.name = name;
-        }
+        LIST,
+        GRID;
 
         @Override
         public String getKey() {
-            return name;
+            return name().toLowerCase();
         }
     }
 
@@ -155,9 +147,26 @@ public class ChanSettings {
             return name;
         }
     }
+
+    public enum ProxyMode
+            implements OptionSettingItem {
+        HTTP(Proxy.Type.HTTP),
+        SOCKS(Proxy.Type.SOCKS);
+
+        Proxy.Type type;
+
+        ProxyMode(Proxy.Type type) {
+            this.type = type;
+        }
+
+        @Override
+        public String getKey() {
+            return type.name().toLowerCase();
+        }
+    }
     //endregion
 
-    private static Proxy proxy;
+    public static Proxy proxy;
     private static final String sharedPrefsFile = "shared_prefs/" + BuildConfig.APPLICATION_ID + "_preferences.xml";
 
     //region Declarations
@@ -211,14 +220,16 @@ public class ChanSettings {
     public static final BooleanSetting enableEmbedding;
     public static final BooleanSetting enableEmoji;
     public static final BooleanSetting parseExtraQuotes;
+    public static final BooleanSetting parseExtraSpoilers;
+    public static final BooleanSetting mildMarkdown;
 
     // Images
     public static final BooleanSetting hideImages;
     public static final BooleanSetting removeImageSpoilers;
     public static final BooleanSetting revealimageSpoilers;
     public static final BooleanSetting parsePostImageLinks;
-    public static final BooleanSetting transparencyOn;
-    public static final BooleanSetting neverShowWebmControls;
+    public static final BooleanSetting useOpaqueBackgrounds;
+    public static final BooleanSetting opacityMenuItem;
     public static final BooleanSetting neverShowAlbumCellInfo;
 
     // Set elsewhere in the application
@@ -235,7 +246,6 @@ public class ChanSettings {
     public static final BooleanSetting imageViewerGestures;
     public static final BooleanSetting alwaysOpenDrawer;
     public static final BooleanSetting applyImageFilterToPost;
-    public static final StringSetting jsCaptchaCookies;
 
     // Reply
     public static final BooleanSetting postPinThread;
@@ -249,15 +259,14 @@ public class ChanSettings {
     public static final BooleanSetting shareUrl;
 
     // Other options
-    public static final StringSetting parseYoutubeAPIKey;
     public static final BooleanSetting fullUserRotationEnable;
     public static final BooleanSetting allowFilePickChooser;
-    public static final BooleanSetting showCopyApkUpdateDialog;
 
     // Proxy
     public static final BooleanSetting proxyEnabled;
     public static final StringSetting proxyAddress;
     public static final IntegerSetting proxyPort;
+    public static final OptionsSetting<ProxyMode> proxyType;
     //endregion
 
     //region MEDIA
@@ -273,8 +282,8 @@ public class ChanSettings {
     public static final BooleanSetting videoAutoLoop;
     public static final BooleanSetting videoDefaultMuted;
     public static final BooleanSetting headsetDefaultMuted;
-    public static final BooleanSetting videoOpenExternal;
-    public static final BooleanSetting videoStream;
+    public static final BooleanSetting neverShowWebmControls;
+    public static final BooleanSetting enableSoundposts;
 
     // Media loading
     public static final OptionsSetting<MediaAutoLoadMode> imageAutoLoadNetwork;
@@ -312,13 +321,12 @@ public class ChanSettings {
 
             //region THREAD WATCHER
             watchEnabled = new BooleanSetting(p, "preference_watch_enabled", false);
-            watchEnabled.addCallback((setting, value) -> postToEventBus(new SettingChanged<>(watchEnabled)));
+            watchEnabled.addCallback(new EventBusCallback<>(watchEnabled));
             watchBackground = new BooleanSetting(p, "preference_watch_background_enabled", false);
-            watchBackground.addCallback((setting, value) -> postToEventBus(new SettingChanged<>(watchBackground)));
+            watchBackground.addCallback(new EventBusCallback<>(watchBackground));
             watchBackgroundInterval =
                     new IntegerSetting(p, "preference_watch_background_interval", (int) MINUTES.toMillis(15));
-            watchBackgroundInterval.addCallback((setting, value) -> postToEventBus(new SettingChanged<>(
-                    watchBackgroundInterval)));
+            watchBackgroundInterval.addCallback(new EventBusCallback<>(watchBackgroundInterval));
             removeWatchedFromCatalog = new BooleanSetting(p, "remove_catalog_watch", false);
             watchLastPageNotify = new BooleanSetting(p, "preference_watch_last_page_notify", false);
             watchNotifyMode = new OptionsSetting<>(p,
@@ -357,6 +365,7 @@ public class ChanSettings {
 
             // Post
             thumbnailSize = new IntegerSetting(p, "preference_thumbnail", 100);
+            thumbnailSize.addCallback((s, v) -> resetThumbnailCacheSize());
             fontSize = new IntegerSetting(p, "preference_font", getRes().getBoolean(R.bool.is_tablet) ? 16 : 14);
             fontAlternate = new BooleanSetting(p, "preference_font_alternate", false);
             shiftPostFormat = new BooleanSetting(p, "shift_post_format", true);
@@ -373,14 +382,16 @@ public class ChanSettings {
             enableEmbedding = new BooleanSetting(p, "parse_media_titles", true);
             enableEmoji = new BooleanSetting(p, "enable_emoji", false);
             parseExtraQuotes = new BooleanSetting(p, "parse_extra_quotes", false);
+            parseExtraSpoilers = new BooleanSetting(p, "parse_extra_spoilers", false);
+            mildMarkdown = new BooleanSetting(p, "parse_markdown_subset", false);
 
             // Images
             hideImages = new BooleanSetting(p, "preference_hide_images", false);
             removeImageSpoilers = new BooleanSetting(p, "preference_reveal_image_spoilers", false);
             revealimageSpoilers = new BooleanSetting(p, "preference_auto_unspoil_images", true);
             parsePostImageLinks = new BooleanSetting(p, "parse_post_image_links", true);
-            transparencyOn = new BooleanSetting(p, "image_transparency_on", false);
-            neverShowWebmControls = new BooleanSetting(p, "never_show_webm_controls", false);
+            useOpaqueBackgrounds = new BooleanSetting(p, "image_transparency_on", false);
+            opacityMenuItem = new BooleanSetting(p, "opacity_menu_item", false);
             neverShowAlbumCellInfo = new BooleanSetting(p, "never_show_album_cell_info", false);
 
             //Elsewhere
@@ -398,7 +409,6 @@ public class ChanSettings {
             imageViewerGestures = new BooleanSetting(p, "image_viewer_gestures", true);
             alwaysOpenDrawer = new BooleanSetting(p, "drawer_auto_open_always", false);
             applyImageFilterToPost = new BooleanSetting(p, "apply_image_filtering_to_post", false);
-            jsCaptchaCookies = new StringSetting(p, "js_captcha_cookies", EMPTY_JSON);
 
             // Reply
             postPinThread = new BooleanSetting(p, "preference_pin_on_post", false);
@@ -412,22 +422,24 @@ public class ChanSettings {
             shareUrl = new BooleanSetting(p, "preference_image_share_url", false);
 
             // Other options
-            // 4chanX's key: AIzaSyB5_zaen_-46Uhz1xGR-lz1YoUMHqCD6CE; not set as a default because lots of people use it
-            // and the quota tends to run out quickly, ending up in a lot of non-parsed titles
-            // default no-api key tries its best to get the info it can, but may fail on certain youtube videos without warning
-            parseYoutubeAPIKey = new StringSetting(p, "parse_youtube_API_key", "");
             fullUserRotationEnable = new BooleanSetting(p, "full_user_rotation_enable", true);
             allowFilePickChooser = new BooleanSetting(p, "allow_file_picker_chooser", false);
-            showCopyApkUpdateDialog = new BooleanSetting(p, "show_copy_apk_update_dialog", true);
 
             // Proxy
             proxyEnabled = new BooleanSetting(p, "preference_proxy_enabled", false);
             proxyAddress = new StringSetting(p, "preference_proxy_address", "");
             proxyPort = new IntegerSetting(p, "preference_proxy_port", 80);
-            proxyEnabled.addCallback((setting, value) -> loadProxy());
-            proxyAddress.addCallback((setting, value) -> loadProxy());
-            proxyPort.addCallback((setting, value) -> loadProxy());
-            loadProxy();
+            proxyType = new OptionsSetting<>(p, "preference_proxy_type", ProxyMode.class, ProxyMode.HTTP);
+            try {
+                proxy = proxyEnabled.get()
+                        ? new Proxy(proxyType.get().type,
+                        InetSocketAddress.createUnresolved(proxyAddress.get(), proxyPort.get())
+                )
+                        : null;
+            } catch (Exception e) {
+                Logger.e("ChanSettings Proxy", "Failed to set up proxy! Using to OkHttp's default.", e);
+                proxy = null;
+            }
             //endregion
 
             //region MEDIA
@@ -443,8 +455,8 @@ public class ChanSettings {
             videoAutoLoop = new BooleanSetting(p, "preference_video_loop", true);
             videoDefaultMuted = new BooleanSetting(p, "preference_video_default_muted", true);
             headsetDefaultMuted = new BooleanSetting(p, "preference_headset_default_muted", true);
-            videoOpenExternal = new BooleanSetting(p, "preference_video_external", false);
-            videoStream = new BooleanSetting(p, "preference_video_stream", false);
+            neverShowWebmControls = new BooleanSetting(p, "never_show_webm_controls", false);
+            enableSoundposts = new BooleanSetting(p, "enable_soundposts", true);
 
             // Media loading
             imageAutoLoadNetwork = new OptionsSetting<>(p,
@@ -494,32 +506,6 @@ public class ChanSettings {
         }
     }
 
-    public static JsCaptchaCookiesJar getJsCaptchaCookieJar(Gson gson) {
-        try {
-            return gson.fromJson(ChanSettings.jsCaptchaCookies.get(), JsCaptchaCookiesJar.class);
-        } catch (Throwable error) {
-            Logger.e("ChanSettings", "Error while trying to deserialize JsCaptchaCookiesJar", error);
-            return JsCaptchaCookiesJar.empty();
-        }
-    }
-
-    /**
-     * Returns a {@link Proxy} if a proxy is enabled, <tt>null</tt> otherwise.
-     *
-     * @return a proxy or null
-     */
-    public static Proxy getProxy() {
-        return proxy;
-    }
-
-    private static void loadProxy() {
-        if (proxyEnabled.get()) {
-            proxy = new Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved(proxyAddress.get(), proxyPort.get()));
-        } else {
-            proxy = null;
-        }
-    }
-
     public static int getBoardColumnCount() {
         return (getScreenOrientation() == ORIENTATION_PORTRAIT
                 ? ChanSettings.boardGridSpanCountPortrait
@@ -532,8 +518,18 @@ public class ChanSettings {
                 : ChanSettings.albumGridSpanCountLandscape).get();
     }
 
-    public static int getThumbnailSize() {
-        return getDimen(getAppContext(), R.dimen.cell_post_thumbnail_size) * ChanSettings.thumbnailSize.get() / 100;
+    private static int thumbnailSizeCached = -1;
+
+    public static int getThumbnailSize(Context c) {
+        if (thumbnailSizeCached == -1) {
+            thumbnailSizeCached =
+                    getDimen(c, R.dimen.cell_post_thumbnail_size) * ChanSettings.thumbnailSize.get() / 100;
+        }
+        return thumbnailSizeCached;
+    }
+
+    private static void resetThumbnailCacheSize() {
+        thumbnailSizeCached = -1;
     }
 
     public static boolean shouldUseFullSizeImage(PostImage postImage) {
@@ -631,6 +627,20 @@ public class ChanSettings {
 
         public SettingChanged(Setting<T> setting) {
             this.setting = setting;
+        }
+    }
+
+    public static class EventBusCallback<T>
+            extends SettingChanged<T>
+            implements Setting.SettingCallback<T> {
+
+        public EventBusCallback(Setting<T> setting) {
+            super(setting);
+        }
+
+        @Override
+        public void onValueChange(Setting<T> setting, T value) {
+            postToEventBus(new SettingChanged<>(setting));
         }
     }
 }

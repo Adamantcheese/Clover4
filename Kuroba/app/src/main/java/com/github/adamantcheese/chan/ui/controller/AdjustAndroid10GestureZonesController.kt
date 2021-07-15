@@ -15,20 +15,23 @@ import com.github.adamantcheese.chan.controller.Controller
 import com.github.adamantcheese.chan.features.gesture_editor.AdjustAndroid10GestureZonesView
 import com.github.adamantcheese.chan.features.gesture_editor.AttachSide
 import com.github.adamantcheese.chan.features.gesture_editor.ExclusionZone
-import com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast
 import com.github.adamantcheese.chan.utils.AndroidUtils.dp
 import com.github.adamantcheese.chan.utils.AndroidUtils.getScreenOrientation
 
 
 @RequiresApi(Build.VERSION_CODES.Q)
-class AdjustAndroid10GestureZonesController(context: Context) : Controller(context) {
+open class AdjustAndroid10GestureZonesController(
+        context: Context,
+        private var attachSide: AttachSide,
+        private var skipZone: ExclusionZone?
+) : Controller(context) {
     private lateinit var viewRoot: RelativeLayout
     private lateinit var adjustZonesView: AdjustAndroid10GestureZonesView
     private lateinit var addZoneButton: Button
 
+    @JvmField
+    var adjusted = false
     private var presenting = false
-    private var attachSide: AttachSide? = null
-    private var skipZone: ExclusionZone? = null
 
     private val globalLayoutListener = object : ViewTreeObserver.OnGlobalLayoutListener {
         override fun onGlobalLayout() {
@@ -46,6 +49,9 @@ class AdjustAndroid10GestureZonesController(context: Context) : Controller(conte
         viewRoot = view.findViewById(R.id.view_root)
         adjustZonesView = view.findViewById(R.id.adjust_gesture_zones_view)
         addZoneButton = view.findViewById(R.id.add_zone_button)
+        if (skipZone != null) {
+            addZoneButton.setText(R.string.apply_options)
+        }
         addZoneButton.setOnClickListener { adjustZonesView.onAddZoneButtonClicked() }
 
         adjustZonesView.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
@@ -57,17 +63,8 @@ class AdjustAndroid10GestureZonesController(context: Context) : Controller(conte
         adjustZonesView.viewTreeObserver.addOnGlobalLayoutListener(globalLayoutListener)
     }
 
-    fun setAttachSide(side: AttachSide) {
-        this.attachSide = side
-    }
-
-    fun setSkipZone(skipZone: ExclusionZone?) {
-        this.skipZone = skipZone
-    }
-
     private fun onViewLaidOut() {
-        val side = checkNotNull(attachSide) { "Attach side was not provided! use setAttachSide()" }
-        setButtonPosition(side)
+        setButtonPosition(attachSide)
 
         adjustZonesView.measure(
                 View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
@@ -76,7 +73,7 @@ class AdjustAndroid10GestureZonesController(context: Context) : Controller(conte
 
         adjustZonesView.hide()
         adjustZonesView.show(
-                side,
+                attachSide,
                 getScreenOrientation(),
                 skipZone,
                 adjustZonesView.width,
@@ -84,7 +81,7 @@ class AdjustAndroid10GestureZonesController(context: Context) : Controller(conte
         )
 
         adjustZonesView.setOnZoneAddedCallback {
-            showToast(context, R.string.setting_exclusion_zones_zone_added)
+            adjusted = true
             stopPresenting()
         }
     }

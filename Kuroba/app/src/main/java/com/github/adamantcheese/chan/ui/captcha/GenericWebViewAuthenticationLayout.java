@@ -20,19 +20,18 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Handler;
 import android.util.AttributeSet;
+import android.webkit.CookieManager;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
-import com.github.adamantcheese.chan.core.site.Site;
+import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.net.NetUtils;
 import com.github.adamantcheese.chan.core.site.SiteAuthentication;
+import com.github.adamantcheese.chan.ui.captcha.CaptchaTokenHolder.CaptchaToken;
 import com.github.adamantcheese.chan.utils.BackgroundUtils;
 
 import java.util.concurrent.TimeUnit;
-
-import javax.inject.Inject;
-
-import static com.github.adamantcheese.chan.Chan.inject;
 
 public class GenericWebViewAuthenticationLayout
         extends WebView
@@ -48,9 +47,6 @@ public class GenericWebViewAuthenticationLayout
     private boolean resettingFromFoundText = false;
     private final boolean isAutoReply = true;
 
-    @Inject
-    CaptchaHolder captchaHolder;
-
     public GenericWebViewAuthenticationLayout(Context context) {
         this(context, null);
     }
@@ -61,17 +57,19 @@ public class GenericWebViewAuthenticationLayout
 
     public GenericWebViewAuthenticationLayout(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-
-        inject(this);
+        getSettings().setUserAgentString(NetUtils.USER_AGENT);
         setFocusableInTouchMode(true);
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
-    public void initialize(Site site, AuthenticationLayoutCallback callback, boolean ignored) {
+    public void initialize(Loadable loadable, AuthenticationLayoutCallback callback, boolean ignored) {
         this.callback = callback;
 
-        authentication = site.actions().postAuthenticate();
+        CookieManager cookieManager = CookieManager.getInstance();
+        cookieManager.setAcceptThirdPartyCookies(this, true);
+
+        authentication = loadable.site.actions().postAuthenticate(loadable);
 
         WebSettings settings = getSettings();
         settings.setJavaScriptEnabled(true);
@@ -80,12 +78,12 @@ public class GenericWebViewAuthenticationLayout
 
     @Override
     public void reset() {
-        if (captchaHolder.hasToken() && isAutoReply) {
-            callback.onAuthenticationComplete(this, null, captchaHolder.getToken(), true);
+        if (isAutoReply && CaptchaTokenHolder.getInstance().hasToken()) {
+            callback.onAuthenticationComplete(this, CaptchaTokenHolder.getInstance().getToken(), true);
             return;
         }
 
-        loadUrl(authentication.url);
+        loadUrl(authentication.baseUrl);
     }
 
     @Override
@@ -109,17 +107,17 @@ public class GenericWebViewAuthenticationLayout
                 }, 1000);
             }
         } else if (success) {
-            captchaHolder.addNewToken(text, RECAPTCHA_TOKEN_LIVE_TIME);
+            CaptchaTokenHolder.getInstance().addNewToken("", text, RECAPTCHA_TOKEN_LIVE_TIME);
 
-            String token;
+            CaptchaToken token;
 
-            if (isAutoReply) {
-                token = captchaHolder.getToken();
+            if (isAutoReply && CaptchaTokenHolder.getInstance().hasToken()) {
+                token = CaptchaTokenHolder.getInstance().getToken();
             } else {
-                token = text;
+                token = new CaptchaToken("", text, 0);
             }
 
-            callback.onAuthenticationComplete(this, "", token, isAutoReply);
+            callback.onAuthenticationComplete(this, token, isAutoReply);
         }
     }
 

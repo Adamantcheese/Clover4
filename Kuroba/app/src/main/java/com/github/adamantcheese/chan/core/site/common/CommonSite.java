@@ -16,15 +16,19 @@
  */
 package com.github.adamantcheese.chan.core.site.common;
 
-import android.webkit.WebView;
-
 import androidx.annotation.CallSuper;
 import androidx.annotation.NonNull;
+import androidx.core.util.Pair;
 
+import com.github.adamantcheese.chan.core.model.InternalSiteArchive;
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.net.NetUtils;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.MainThreadResponseResult;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.PassthroughBitmapResult;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.ResponseResult;
 import com.github.adamantcheese.chan.core.settings.primitives.JsonSettings;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.SiteActions;
@@ -37,22 +41,20 @@ import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.Boards;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.ChanPages;
 import com.github.adamantcheese.chan.core.site.http.DeleteRequest;
 import com.github.adamantcheese.chan.core.site.http.DeleteResponse;
-import com.github.adamantcheese.chan.core.site.http.HttpCall;
-import com.github.adamantcheese.chan.core.site.http.HttpCall.HttpCallback;
 import com.github.adamantcheese.chan.core.site.http.LoginRequest;
+import com.github.adamantcheese.chan.core.site.http.LoginResponse;
 import com.github.adamantcheese.chan.core.site.http.ReplyResponse;
 import com.github.adamantcheese.chan.core.site.parser.ChanReader;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser;
 import com.github.adamantcheese.chan.core.site.parser.PostParser;
-import com.github.adamantcheese.chan.utils.BackgroundUtils;
 
-import java.util.Arrays;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import okhttp3.HttpUrl;
-import okhttp3.Request;
 import okhttp3.Response;
 
 import static android.text.TextUtils.isEmpty;
@@ -72,7 +74,6 @@ public abstract class CommonSite
     private CommonEndpoints endpoints;
     private CommonActions actions;
     private CommonApi api;
-    private final CommonCallModifier callModifier = new CommonCallModifier() {};
 
     public PostParser postParser;
 
@@ -149,7 +150,7 @@ public abstract class CommonSite
 
     public void setBoards(Board... boards) {
         boardsType = BoardsType.STATIC;
-        staticBoards.addAll(Arrays.asList(boards));
+        Collections.addAll(staticBoards, boards);
     }
 
     public void setConfig(CommonConfig config) {
@@ -221,11 +222,6 @@ public abstract class CommonSite
     }
 
     @Override
-    public CommonCallModifier callModifier() {
-        return callModifier;
-    }
-
-    @Override
     public ChanReader chanReader() {
         return api;
     }
@@ -269,7 +265,7 @@ public abstract class CommonSite
 
         @Override
         public boolean matchesMediaHost(@NonNull HttpUrl url) {
-            return SiteBase.containsMediaHostUrl(url, getMediaHosts());
+            return SiteUrlHandler.containsMediaHostUrl(url, getMediaHosts());
         }
 
         @Override
@@ -371,7 +367,7 @@ public abstract class CommonSite
         }
 
         @Override
-        public HttpUrl icon(String icon, Map<String, String> arg) {
+        public Pair<HttpUrl, PassthroughBitmapResult> icon(ICON_TYPE icon, Map<String, String> arg) {
             return null;
         }
 
@@ -446,36 +442,32 @@ public abstract class CommonSite
 
         @Override
         public void post(Loadable loadableWithDraft, PostListener postListener) {
-            ReplyResponse replyResponse = new ReplyResponse(loadableWithDraft);
-
-            MultipartHttpCall call = new MultipartHttpCall(site) {
-                @Override
-                public void process(Response response, String result) {
-                    handlePost(replyResponse, response, result);
-                }
-            };
+            MultipartHttpCall<ReplyResponse> call =
+                    new MultipartHttpCall<ReplyResponse>(new MainThreadResponseResult<>(postListener)) {
+                        @Override
+                        public ReplyResponse convert(Response response) {
+                            return handlePost(loadableWithDraft, response);
+                        }
+                    };
 
             call.url(site.endpoints().reply(loadableWithDraft));
 
-            if (requirePrepare()) {
-                BackgroundUtils.runOnBackgroundThread(() -> {
-                    prepare(call, replyResponse);
-                    BackgroundUtils.runOnMainThread(() -> {
-                        setupPost(loadableWithDraft, call);
-                        makePostCall(call, replyResponse, postListener);
-                    });
-                });
-            } else {
-                setupPost(loadableWithDraft, call);
-                makePostCall(call, replyResponse, postListener);
-            }
+            prepare(call, loadableWithDraft, new ResponseResult<Void>() {
+                @Override
+                public void onFailure(Exception e) {}
+
+                @Override
+                public void onSuccess(Void result) {
+                    setupPost(loadableWithDraft, call);
+                    NetUtils.makeHttpCall(call);
+                }
+            });
         }
 
-        public void setupPost(Loadable loadable, MultipartHttpCall call) {
+        public void setupPost(Loadable loadable, MultipartHttpCall<ReplyResponse> call) {
         }
 
-        public void handlePost(ReplyResponse response, Response httpResponse, String responseBody) {
-        }
+        public abstract ReplyResponse handlePost(Loadable loadable, Response httpResponse);
 
         @Override
         public boolean postRequiresAuthentication() {
@@ -483,83 +475,63 @@ public abstract class CommonSite
         }
 
         @Override
-        public SiteAuthentication postAuthenticate() {
+        public SiteAuthentication postAuthenticate(Loadable loadableWithDraft) {
             return SiteAuthentication.fromNone();
         }
 
-        private void makePostCall(HttpCall call, ReplyResponse replyResponse, PostListener postListener) {
-            NetUtils.makeHttpCall(call, new HttpCallback<HttpCall>() {
-                @Override
-                public void onHttpSuccess(HttpCall httpCall) {
-                    postListener.onPostComplete(replyResponse);
-                }
-
-                @Override
-                public void onHttpFail(HttpCall httpCall, Exception e) {
-                    postListener.onPostError(e);
-                }
-            });
-        }
-
-        public boolean requirePrepare() {
-            return false;
-        }
-
-        public void prepare(MultipartHttpCall call, ReplyResponse replyResponse) {
+        public void prepare(
+                MultipartHttpCall<ReplyResponse> call,
+                Loadable loadable,
+                NetUtilsClasses.ResponseResult<Void> extraHeaders
+        ) {
+            // by default, no class needs any extra headers so just invoke the result immediately
+            extraHeaders.onSuccess(null);
         }
 
         @Override
-        public void delete(DeleteRequest deleteRequest, DeleteListener deleteListener) {
-            DeleteResponse deleteResponse = new DeleteResponse();
-
-            MultipartHttpCall call = new MultipartHttpCall(site) {
-                @Override
-                public void process(Response response, String result) {
-                    handleDelete(deleteResponse, response, result);
-                }
-            };
+        public void delete(DeleteRequest deleteRequest, ResponseResult<DeleteResponse> deleteListener) {
+            MultipartHttpCall<DeleteResponse> call =
+                    new MultipartHttpCall<DeleteResponse>(new MainThreadResponseResult<>(deleteListener)) {
+                        @Override
+                        public DeleteResponse convert(Response response)
+                                throws IOException {
+                            return handleDelete(response);
+                        }
+                    };
 
             call.url(site.endpoints().delete(deleteRequest.post));
             setupDelete(deleteRequest, call);
-            NetUtils.makeHttpCall(call, new HttpCallback<HttpCall>() {
-                @Override
-                public void onHttpSuccess(HttpCall httpCall) {
-                    deleteListener.onDeleteComplete(deleteResponse);
-                }
-
-                @Override
-                public void onHttpFail(HttpCall httpCall, Exception e) {
-                    deleteListener.onDeleteError(e);
-                }
-            });
+            NetUtils.makeHttpCall(call);
         }
 
-        public void setupDelete(DeleteRequest deleteRequest, MultipartHttpCall call) {
+        public void setupDelete(DeleteRequest deleteRequest, MultipartHttpCall<DeleteResponse> call) {
         }
 
-        public void handleDelete(DeleteResponse response, Response httpResponse, String responseBody) {
+        public DeleteResponse handleDelete(Response httpResponse)
+                throws IOException {
+            return new DeleteResponse();
         }
 
         @Override
-        public void boards(BoardsListener boardsListener) {
-            boardsListener.onBoardsReceived(new Boards(site.staticBoards));
+        public void boards(ResponseResult<Boards> boardsListener) {
+            boardsListener.onSuccess(new Boards(site.staticBoards));
         }
 
         @Override
-        public void pages(Board board, PagesListener pagesListener) {
-            pagesListener.onPagesReceived(board, new ChanPages());
+        public void pages(Board board, ResponseResult<ChanPages> pagesListener) {
+            pagesListener.onSuccess(new ChanPages());
         }
 
         @Override
-        public void archive(Board board, ArchiveListener archiveListener) {
+        public void archive(Board board, ResponseResult<InternalSiteArchive> archiveListener) {
         }
 
         @Override
-        public void login(LoginRequest loginRequest, LoginListener loginListener) {
+        public void login(LoginRequest loginRequest, ResponseResult<LoginResponse> loginListener) {
         }
 
         @Override
-        public void logout() {
+        public void logout(final ResponseResult<LoginResponse> loginListener) {
         }
 
         @Override
@@ -584,14 +556,6 @@ public abstract class CommonSite
         @Override
         public PostParser getParser() {
             return site.postParser;
-        }
-    }
-
-    public abstract static class CommonCallModifier {
-        public void modifyHttpCall(HttpCall httpCall, Request.Builder requestBuilder) {
-        }
-
-        public void modifyWebView(WebView webView) {
         }
     }
 }

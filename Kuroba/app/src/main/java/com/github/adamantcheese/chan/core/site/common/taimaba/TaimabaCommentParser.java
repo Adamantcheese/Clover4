@@ -16,6 +16,7 @@
  */
 package com.github.adamantcheese.chan.core.site.common.taimaba;
 
+import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser;
 import com.github.adamantcheese.chan.core.site.parser.StyleRule;
 
@@ -28,8 +29,6 @@ public class TaimabaCommentParser
         addDefaultRules();
         rule(StyleRule.tagRule("strike").strikeThrough());
         rule(StyleRule.tagRule("pre").monospace().size(sp(12f)));
-        rule(StyleRule.tagRule("blockquote")
-                .cssClass("unkfunc")
-                .foregroundColor(StyleRule.ForegroundColor.INLINE_QUOTE));
+        rule(StyleRule.tagRule("blockquote").cssClass("unkfunc").foregroundColor(R.attr.post_inline_quote_color, true));
     }
 }

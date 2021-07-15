@@ -46,7 +46,6 @@ import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Filter;
 import com.github.adamantcheese.chan.core.repository.BoardRepository;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.Boards;
-import com.github.adamantcheese.chan.ui.helper.BoardHelper;
 import com.github.adamantcheese.chan.ui.text.BackgroundColorSpanHashed;
 import com.github.adamantcheese.chan.ui.view.ColorPickerView;
 import com.github.adamantcheese.chan.ui.view.FloatingMenu;
@@ -237,7 +236,7 @@ public class FilterLayout
             }
 
             for (Board board : allSavedBoards) {
-                String name = BoardHelper.getName(board);
+                String name = board.getFormattedName();
                 boolean checked = filterEngine.matchesBoard(filter, board);
 
                 items.add(new SelectLayout.SelectItem<>(board, board.id, name, "", name, checked));
@@ -330,7 +329,7 @@ public class FilterLayout
     }
 
     private void updateFilterValidity() {
-        int extraFlags = (filter.type & FilterType.COUNTRY_CODE.flag) != 0 ? Pattern.CASE_INSENSITIVE : 0;
+        int extraFlags = (filter.type & FilterType.FLAG_CODE.flag) != 0 ? Pattern.CASE_INSENSITIVE : 0;
         boolean valid = !TextUtils.isEmpty(filter.pattern) && filterEngine.compile(filter.pattern, extraFlags) != null;
         pattern.setError(valid ? null : getString(R.string.filter_invalid_pattern));
 

@@ -42,6 +42,8 @@ import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.SubMenu;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -60,27 +62,29 @@ import com.github.adamantcheese.chan.core.model.ChanThread;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.presenter.ReplyPresenter;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
-import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.SiteAuthentication;
 import com.github.adamantcheese.chan.core.site.http.Reply;
 import com.github.adamantcheese.chan.core.site.sites.chan4.Chan4;
 import com.github.adamantcheese.chan.ui.captcha.AuthenticationLayoutCallback;
 import com.github.adamantcheese.chan.ui.captcha.AuthenticationLayoutInterface;
-import com.github.adamantcheese.chan.ui.captcha.CaptchaHolder;
-import com.github.adamantcheese.chan.ui.captcha.CaptchaLayout;
+import com.github.adamantcheese.chan.ui.captcha.CaptchaTokenHolder;
+import com.github.adamantcheese.chan.ui.captcha.CustomJsonLayout;
 import com.github.adamantcheese.chan.ui.captcha.GenericWebViewAuthenticationLayout;
 import com.github.adamantcheese.chan.ui.captcha.LegacyCaptchaLayout;
-import com.github.adamantcheese.chan.ui.captcha.v1.CaptchaNojsLayoutV1;
-import com.github.adamantcheese.chan.ui.captcha.v2.CaptchaNoJsLayoutV2;
+import com.github.adamantcheese.chan.ui.captcha.v2.js.CaptchaV2JsLayout;
+import com.github.adamantcheese.chan.ui.captcha.v2.nojs.CaptchaV2NoJsFallbackLayout;
+import com.github.adamantcheese.chan.ui.captcha.v2.nojs.CaptchaV2NoJsLayout;
 import com.github.adamantcheese.chan.ui.helper.ImagePickDelegate;
 import com.github.adamantcheese.chan.ui.helper.RefreshUIMessage;
+import com.github.adamantcheese.chan.ui.theme.ThemeHelper;
+import com.github.adamantcheese.chan.ui.view.FloatingMenu;
+import com.github.adamantcheese.chan.ui.view.FloatingMenuItem;
 import com.github.adamantcheese.chan.ui.view.LoadView;
 import com.github.adamantcheese.chan.ui.view.SelectionListeningEditText;
 import com.github.adamantcheese.chan.utils.AndroidUtils;
 import com.github.adamantcheese.chan.utils.BitmapUtils;
 import com.github.adamantcheese.chan.utils.Logger;
 import com.github.adamantcheese.chan.utils.StringUtils;
-import com.skydoves.balloon.ArrowConstraints;
 import com.skydoves.balloon.ArrowOrientation;
 import com.skydoves.balloon.Balloon;
 import com.vdurmont.emoji.EmojiParser;
@@ -89,12 +93,12 @@ import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 
 import java.io.File;
-
-import javax.inject.Inject;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
-import static com.github.adamantcheese.chan.Chan.inject;
 import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.dp;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrColor;
@@ -105,11 +109,9 @@ import static com.github.adamantcheese.chan.utils.AndroidUtils.requestViewAndKey
 public class ReplyLayout
         extends LoadView
         implements ReplyPresenter.ReplyPresenterCallback, TextWatcher,
-                   SelectionListeningEditText.SelectionChangedListener, CaptchaHolder.CaptchaValidationListener {
+                   SelectionListeningEditText.SelectionChangedListener, CaptchaTokenHolder.CaptchaValidationListener {
 
     ReplyPresenter presenter;
-    @Inject
-    CaptchaHolder captchaHolder;
 
     private ReplyLayoutCallback callback;
 
@@ -127,7 +129,7 @@ public class ReplyLayout
     private TextView message;
     private EditText name;
     private EditText subject;
-    private EditText flag;
+    private Button flag;
     private EditText options;
     private EditText fileName;
     private LinearLayout postOptions;
@@ -147,6 +149,7 @@ public class ReplyLayout
     private ImageView more;
     private ImageView attach;
     private Space spacer;
+    private ImageView reencodeImage;
     private ImageView filenameNew;
     // the tag on this is the spoiler state; that is, getTag -> true means image will be spoilered
     private ImageView spoiler;
@@ -183,7 +186,7 @@ public class ReplyLayout
         if (isInEditMode()) return;
 
         EventBus.getDefault().register(this);
-        captchaHolder.addListener(this);
+        CaptchaTokenHolder.getInstance().addListener(this);
     }
 
     @Override
@@ -192,15 +195,12 @@ public class ReplyLayout
         if (isInEditMode()) return;
 
         EventBus.getDefault().unregister(this);
-        captchaHolder.removeListener(this);
+        CaptchaTokenHolder.getInstance().removeListener(this);
     }
 
     @Override
     protected void onFinishInflate() {
         super.onFinishInflate();
-        if (!isInEditMode()) {
-            inject(this);
-        }
 
         presenter = new ReplyPresenter(getContext(), this);
 
@@ -209,7 +209,7 @@ public class ReplyLayout
         message = replyInputLayout.findViewById(R.id.message);
         name = replyInputLayout.findViewById(R.id.name);
         subject = replyInputLayout.findViewById(R.id.subject);
-        flag = replyInputLayout.findViewById(R.id.flag);
+        flag = replyInputLayout.findViewById(R.id.flag_button);
         options = replyInputLayout.findViewById(R.id.options);
         fileName = replyInputLayout.findViewById(R.id.file_name);
         filenameNew = replyInputLayout.findViewById(R.id.filename_new);
@@ -231,6 +231,7 @@ public class ReplyLayout
         attach = replyInputLayout.findViewById(R.id.attach);
         ConstraintLayout submit = replyInputLayout.findViewById(R.id.submit);
         spacer = replyInputLayout.findViewById(R.id.spacer);
+        reencodeImage = replyInputLayout.findViewById(R.id.reencode);
         filenameNew = replyInputLayout.findViewById(R.id.filename_new);
         spoiler = replyInputLayout.findViewById(R.id.spoiler);
 
@@ -252,6 +253,60 @@ public class ReplyLayout
 
         name.addTextChangedListener(this);
         flag.addTextChangedListener(this);
+        flag.setOnClickListener(v -> {
+            List<FloatingMenuItem<String>> items = new ArrayList<>();
+            items.add(new FloatingMenuItem<>(null, "No Flag"));
+            Map<String, String> boardFlags = presenter.getBoardFlags();
+            FloatingMenuItem<String> selected = null;
+            for (String key : boardFlags.keySet()) {
+                FloatingMenuItem<String> flagItem = new FloatingMenuItem<>(key, boardFlags.get(key));
+                if (key.contentEquals(flag.getText())) {
+                    selected = flagItem;
+                }
+                items.add(flagItem);
+            }
+            if (items.isEmpty()) return;
+            FloatingMenu<String> menu = new FloatingMenu<>(getContext(), flag, items);
+            menu.setAnchorGravity(Gravity.CENTER, 0, 0);
+            menu.setAdapter(new BaseAdapter() {
+                @Override
+                public int getCount() {
+                    return items.size();
+                }
+
+                @Override
+                public String getItem(int position) {
+                    return items.get(position).getText();
+                }
+
+                @Override
+                public long getItemId(int position) {
+                    return position;
+                }
+
+                @Override
+                public View getView(int position, View convertView, ViewGroup parent) {
+                    TextView textView = (TextView) (convertView != null
+                            ? convertView
+                            : LayoutInflater.from(parent.getContext())
+                                    .inflate(R.layout.toolbar_menu_item, parent, false));
+                    textView.setText(getItem(position));
+                    textView.setTypeface(ThemeHelper.getTheme().mainFont);
+                    return textView;
+                }
+            });
+            menu.setSelectedItem(selected);
+            menu.setCallback(new FloatingMenu.ClickCallback<String>() {
+                @Override
+                public void onFloatingMenuItemClicked(
+                        FloatingMenu<String> menu, FloatingMenuItem<String> item
+                ) {
+                    flag.setText(item.getId());
+                }
+            });
+            menu.setPopupHeight(dp(300));
+            menu.show();
+        });
         options.addTextChangedListener(this);
         subject.addTextChangedListener(this);
         comment.addTextChangedListener(this);
@@ -264,15 +319,6 @@ public class ReplyLayout
         setupCommentContextMenu();
 
         setupOptionsContextMenu();
-
-        previewHolder.setOnClickListener(v -> {
-            if (presenter.isAttachedFileSupportedForReencoding()) {
-                attach.setClickable(false); // prevent immediately removing the file
-                callback.showImageReencodingWindow();
-            } else {
-                showToast(getContext(), R.string.file_cannot_be_reencoded, Toast.LENGTH_LONG);
-            }
-        });
 
         if (!isInEditMode()) {
             more.setRotation(ChanSettings.moveInputToBottom.get() ? 180f : 0f);
@@ -289,6 +335,15 @@ public class ReplyLayout
         submit.setOnLongClickListener(v -> {
             presenter.onSubmitClicked(true);
             return true;
+        });
+
+        reencodeImage.setOnClickListener(v -> {
+            if (presenter.isAttachedFileSupportedForReencoding()) {
+                attach.setClickable(false); // prevent immediately removing the file
+                callback.showImageReencodingWindow();
+            } else {
+                showToast(getContext(), R.string.file_cannot_be_reencoded, Toast.LENGTH_LONG);
+            }
         });
 
         filenameNew.setOnClickListener(v -> {
@@ -386,8 +441,10 @@ public class ReplyLayout
 
     private boolean insertTags(String before, String after) {
         int selectionStart = comment.getSelectionStart();
+        int selectLen = comment.getSelectionEnd() - comment.getSelectionStart();
         comment.getText().insert(comment.getSelectionEnd(), after);
         comment.getText().insert(selectionStart, before);
+        comment.setSelection(before.length() + selectionStart + selectLen);
         return true;
     }
 
@@ -399,7 +456,7 @@ public class ReplyLayout
 
     @Override
     public void initializeAuthentication(
-            Site site,
+            Loadable loadable,
             SiteAuthentication authentication,
             AuthenticationLayoutCallback callback,
             boolean useV2NoJsCaptcha,
@@ -412,15 +469,15 @@ public class ReplyLayout
                             .inflate(R.layout.layout_captcha_legacy, captchaContainer, false);
                     break;
                 case CAPTCHA2:
-                    authenticationLayout = new CaptchaLayout(getContext());
+                    authenticationLayout = new CaptchaV2JsLayout(getContext());
                     break;
                 case CAPTCHA2_NOJS:
                     if (useV2NoJsCaptcha) {
                         // new captcha window without webview
-                        authenticationLayout = new CaptchaNoJsLayoutV2(getContext());
+                        authenticationLayout = new CaptchaV2NoJsLayout(getContext());
                     } else {
                         // default webview-based captcha view
-                        authenticationLayout = new CaptchaNojsLayoutV1(getContext());
+                        authenticationLayout = new CaptchaV2NoJsFallbackLayout(getContext());
                     }
 
                     ImageView resetButton = captchaContainer.findViewById(R.id.reset);
@@ -434,6 +491,11 @@ public class ReplyLayout
                         }
                     }
 
+                    break;
+                case CUSTOM_JSON:
+                    // specific to 4chan, may abstract in the future
+                    authenticationLayout = (CustomJsonLayout) LayoutInflater.from(getContext())
+                            .inflate(R.layout.layout_captcha_custom_json, captchaContainer, false);
                     break;
                 case GENERIC_WEBVIEW:
                     GenericWebViewAuthenticationLayout view = new GenericWebViewAuthenticationLayout(getContext());
@@ -455,7 +517,7 @@ public class ReplyLayout
             hideKeyboard(this);
         }
 
-        authenticationLayout.initialize(site, callback, autoReply);
+        authenticationLayout.initialize(loadable, callback, autoReply);
         authenticationLayout.reset();
     }
 
@@ -491,8 +553,8 @@ public class ReplyLayout
         }
 
         // cleanup resources when switching from the new to the old captcha view
-        if (authenticationLayout instanceof CaptchaNoJsLayoutV2) {
-            ((CaptchaNoJsLayoutV2) authenticationLayout).onDestroy();
+        if (authenticationLayout instanceof CaptchaV2NoJsLayout) {
+            ((CaptchaV2NoJsLayout) authenticationLayout).onDestroy();
         }
 
         captchaContainer.removeView((View) authenticationLayout);
@@ -684,7 +746,7 @@ public class ReplyLayout
     public void setExpanded(boolean expanded) {
         setWrappingMode(expanded);
         comment.setMaxLines(expanded ? 500 : 6);
-        previewHolder.setLayoutParams(new LinearLayout.LayoutParams(MATCH_PARENT, expanded ? dp(150) : dp(100)));
+        previewHolder.setLayoutParams(new LinearLayout.LayoutParams(MATCH_PARENT, expanded ? dp(300) : dp(200)));
         more.setRotation(ChanSettings.moveInputToBottom.get() ? (expanded ? 0f : 180f) : (expanded ? 180f : 0f));
 
         setDividerVisibility(expanded);
@@ -695,7 +757,7 @@ public class ReplyLayout
     }
 
     private void setDividerVisibility(boolean hide) {
-        if(isInEditMode()) {
+        if (isInEditMode()) {
             topDivider.setVisibility(GONE);
             botDivider.setVisibility(VISIBLE);
             return;
@@ -720,7 +782,7 @@ public class ReplyLayout
 
     @Override
     public void openPostOptions(boolean open) {
-        postOptions.setVisibility(open || ChanSettings.alwaysShowPostOptions.get() ? VISIBLE : GONE);
+        postOptions.setVisibility(open ? VISIBLE : GONE);
     }
 
     @Override
@@ -790,28 +852,27 @@ public class ReplyLayout
 
     @Override
     public void openPreview(boolean show, File previewFile) {
-        previewHolder.setClickable(false);
         if (show) {
             BitmapUtils.decodeFilePreviewImage(previewFile, dp(400), dp(300), bitmap -> {
                 if (bitmap != null) {
                     preview.setImageBitmap(bitmap);
                     previewHolder.setVisibility(VISIBLE);
                     callback.updatePadding();
-
-                    showReencodeImageHint();
+                    showImageOptionHints();
                 } else {
                     openPreviewMessage(true, getString(R.string.reply_no_preview));
                 }
             }, true);
             fileName.setVisibility(presenter.isExpanded() ? VISIBLE : GONE);
             spacer.setVisibility(VISIBLE);
+            reencodeImage.setVisibility(VISIBLE);
             filenameNew.setVisibility(VISIBLE);
             spoiler.setVisibility(presenter.canPostSpoileredImages() ? VISIBLE : GONE);
-            showImageOptionHints();
             attach.setImageResource(R.drawable.ic_fluent_dismiss_24_filled);
         } else {
             fileName.setVisibility(GONE);
             spacer.setVisibility(GONE);
+            reencodeImage.setVisibility(GONE);
             filenameNew.setVisibility(GONE);
             spoiler.setVisibility(GONE);
             spoiler.setTag(previewFile == null ? false : spoiler.getTag());
@@ -821,9 +882,6 @@ public class ReplyLayout
             callback.updatePadding();
             attach.setImageResource(R.drawable.ic_fluent_image_add_24_filled);
         }
-        // the delay is taken from LayoutTransition, as this class is set to automatically animate layout changes
-        // only allow the preview to be clicked if it is fully visible
-        postDelayed(() -> previewHolder.setClickable(true), 300);
     }
 
     @Override
@@ -836,6 +894,12 @@ public class ReplyLayout
     public void enableImageAttach(boolean canAttach) {
         attach.setVisibility(canAttach ? VISIBLE : GONE);
         attach.setEnabled(canAttach);
+    }
+
+    @Override
+    public void enableName(boolean canName) {
+        name.setVisibility(canName ? VISIBLE : GONE);
+        name.setEnabled(canName);
     }
 
     @Override
@@ -1039,17 +1103,12 @@ public class ReplyLayout
         attach.setClickable(true); // reencode window gone, allow the file to be removed
     }
 
-    private void showReencodeImageHint() {
-        AndroidUtils.getBaseToolTip(getContext())
-                .setArrowConstraints(ArrowConstraints.ALIGN_ANCHOR)
-                .setPreferenceName("ReencodeHint")
-                .setArrowOrientation(ArrowOrientation.TOP)
-                .setTextResource(R.string.tap_image_for_extra_options)
-                .build()
-                .showAlignBottom(preview);
-    }
-
     private void showImageOptionHints() {
+        Balloon reencodeHint = AndroidUtils.getBaseToolTip(getContext())
+                .setPreferenceName("ReencodeHint")
+                .setArrowOrientation(ArrowOrientation.RIGHT)
+                .setTextResource(R.string.reencode_button_hint)
+                .build();
         Balloon filenameHint = AndroidUtils.getBaseToolTip(getContext())
                 .setPreferenceName("ReplyFilenameRefreshHint")
                 .setArrowOrientation(ArrowOrientation.RIGHT)
@@ -1060,10 +1119,14 @@ public class ReplyLayout
                 .setArrowOrientation(ArrowOrientation.RIGHT)
                 .setTextResource(R.string.reply_spoiler_hint)
                 .build();
+
         if (presenter.canPostSpoileredImages()) {
+            spoilerHint.relayShowAlignLeft(filenameHint, filenameNew).relayShowAlignLeft(reencodeHint, reencodeImage);
             spoilerHint.showAlignLeft(spoiler);
+        } else {
+            filenameHint.relayShowAlignLeft(reencodeHint, reencodeImage);
+            filenameHint.showAlignLeft(filenameNew);
         }
-        filenameHint.showAlignLeft(filenameNew);
     }
 
     @Override

@@ -7,17 +7,17 @@ import android.text.format.DateUtils;
 import android.util.Base64;
 
 import androidx.annotation.ColorInt;
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.github.adamantcheese.chan.core.manager.FilterEngine;
 import com.github.adamantcheese.chan.ui.text.SearchHighlightSpan;
+import com.github.adamantcheese.chan.ui.theme.Theme;
+import com.google.common.io.Files;
 import com.vdurmont.emoji.EmojiParser;
 
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.List;
 import java.util.Locale;
 import java.util.TimeZone;
 import java.util.regex.Matcher;
@@ -36,26 +36,6 @@ public class StringUtils {
 
     static {
         UTCFormat.setTimeZone(TimeZone.getTimeZone("UTC"));
-    }
-
-    @Nullable
-    public static String extractFileNameExtension(String filename) {
-        int index = filename.lastIndexOf('.');
-        if (index == -1) {
-            return null;
-        }
-
-        return filename.substring(index + 1);
-    }
-
-    @NonNull
-    public static String removeExtensionFromFileName(String filename) {
-        int index = filename.lastIndexOf('.');
-        if (index == -1) {
-            return filename;
-        }
-
-        return filename.substring(0, index);
     }
 
     public static String dirNameRemoveBadCharacters(String dirName) {
@@ -96,20 +76,37 @@ public class StringUtils {
             return result;
         }
 
-        String extension = extractFileNameExtension(result);
+        String extension = Files.getFileExtension(result);
 
-        int extensionLength = extension == null ? 0 : (extension.length() + 1);
-        int charactersToTrim = 3 + extensionLength;
+        int charactersToTrim = 4 + extension.length();
 
         if (result.length() < charactersToTrim) {
             return result;
         }
 
         String trimmedUrl = result.substring(0, result.length() - charactersToTrim);
-        return trimmedUrl + "XXX" + (extension == null ? "" : "." + extension);
+        return trimmedUrl + "XXX." + extension;
     }
 
-    public static boolean endsWithAny(String s, String[] suffixes) {
+    public static boolean isAnyIgnoreCase(String s, String... strings) {
+        for (String str : strings) {
+            if (s.equalsIgnoreCase(str)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean startsWithAny(String s, String... prefixes) {
+        for (String prefix : prefixes) {
+            if (s.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static boolean endsWithAny(String s, String... suffixes) {
         for (String suffix : suffixes) {
             if (s.endsWith(suffix)) {
                 return true;
@@ -118,7 +115,7 @@ public class StringUtils {
         return false;
     }
 
-    public static boolean containsAny(CharSequence s, List<CharSequence> contains) {
+    public static boolean containsAny(CharSequence s, CharSequence... contains) {
         for (CharSequence contain : contains) {
             if (TextUtils.indexOf(s, contain) >= 0) {
                 return true;
@@ -159,6 +156,11 @@ public class StringUtils {
     public static String getCurrentTimeDefaultLocale() {
         return DateFormat.getDateTimeInstance(DateFormat.DEFAULT, DateFormat.DEFAULT, Locale.getDefault())
                 .format(new Date());
+    }
+
+    public static String getTimeDefaultLocale(long unixTime) {
+        return DateFormat.getDateTimeInstance(DateFormat.DEFAULT, DateFormat.DEFAULT, Locale.getDefault())
+                .format(new Date(unixTime));
     }
 
     public static String centerEllipsize(String string, int maxLength) {
@@ -241,22 +243,24 @@ public class StringUtils {
         return "[" + ((out.charAt(0) == '0' && Character.isDigit(out.charAt(1))) ? out.substring(1) : out) + "]";
     }
 
-    public static SpannableStringBuilder applySearchSpans(CharSequence source, String searchQuery) {
-        SpannableStringBuilder commentCopy = new SpannableStringBuilder(source);
+    public static SpannableStringBuilder applySearchSpans(
+            Theme theme, @Nullable CharSequence source, String searchQuery
+    ) {
+        SpannableStringBuilder sourceCopy = new SpannableStringBuilder(source == null ? "" : source);
         if (!TextUtils.isEmpty(searchQuery)) {
             Pattern search = Pattern.compile(FilterEngine.escapeRegex(searchQuery), Pattern.CASE_INSENSITIVE);
-            Matcher searchMatch = search.matcher(commentCopy);
+            Matcher searchMatch = search.matcher(sourceCopy);
             // apply new spans
             while (searchMatch.find()) {
-                commentCopy.setSpan(
-                        new SearchHighlightSpan(),
+                sourceCopy.setSpan(
+                        new SearchHighlightSpan(theme),
                         searchMatch.toMatchResult().start(),
                         searchMatch.toMatchResult().end(),
                         Spanned.SPAN_INCLUSIVE_EXCLUSIVE
                 );
             }
         }
-        return commentCopy;
+        return sourceCopy;
     }
 
     // Copied from Apache Commons Lang 3, modified for SpannableStringBuilders

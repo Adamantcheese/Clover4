@@ -16,28 +16,33 @@
  */
 package com.github.adamantcheese.chan.core.site.sites.chan4;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.github.adamantcheese.chan.core.site.Site;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
+import com.github.adamantcheese.chan.core.net.ProgressRequestBody;
 import com.github.adamantcheese.chan.core.site.http.HttpCall;
 import com.github.adamantcheese.chan.core.site.http.LoginRequest;
 import com.github.adamantcheese.chan.core.site.http.LoginResponse;
-import com.github.adamantcheese.chan.core.site.http.ProgressRequestBody;
 
-import java.net.HttpCookie;
-import java.util.List;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import okhttp3.FormBody;
 import okhttp3.Request;
 import okhttp3.Response;
 
-public class Chan4PassHttpCall
-        extends HttpCall {
-    private final LoginRequest loginRequest;
-    public final LoginResponse loginResponse = new LoginResponse();
+import static com.github.adamantcheese.chan.core.net.NetUtilsClasses.HTML_CONVERTER;
 
-    public Chan4PassHttpCall(Site site, LoginRequest loginRequest) {
-        super(site);
+public class Chan4PassHttpCall
+        extends HttpCall<LoginResponse> {
+    private final LoginRequest loginRequest;
+
+    public Chan4PassHttpCall(
+            @NonNull NetUtilsClasses.ResponseResult<LoginResponse> callback, LoginRequest loginRequest
+    ) {
+        super(callback);
         this.loginRequest = loginRequest;
     }
 
@@ -47,56 +52,35 @@ public class Chan4PassHttpCall
     ) {
         FormBody.Builder formBuilder = new FormBody.Builder();
 
-        formBuilder.add("act", "do_login");
+        if (loginRequest.login) {
+            formBuilder.add("id", loginRequest.user);
+            formBuilder.add("pin", loginRequest.pass);
+        } else {
+            formBuilder.add("logout", "1");
+        }
 
-        formBuilder.add("id", loginRequest.user);
-        formBuilder.add("pin", loginRequest.pass);
-
-        requestBuilder.url(getSite().endpoints().login());
+        requestBuilder.url(loginRequest.site.endpoints().login());
         requestBuilder.post(formBuilder.build());
     }
 
     @Override
-    public void process(Response response, String result) {
-        boolean authSuccess = false;
-        if (result.contains("Success! Your device is now authorized")) {
-            authSuccess = true;
-        } else {
-            String message;
-            if (result.contains("Your Token must be exactly 10 characters")) {
-                message = "Incorrect token";
-            } else if (result.contains("You have left one or more fields blank")) {
-                message = "You have left one or more fields blank";
-            } else if (result.contains("Incorrect Token or PIN")) {
-                message = "Incorrect Token or PIN";
-            } else {
-                message = "Unknown error";
-            }
-            loginResponse.message = message;
+    public LoginResponse convert(Response response) {
+        if (!loginRequest.login) {
+            return new LoginResponse("Logged out!", true);
         }
-
-        if (authSuccess) {
-            List<String> cookies = response.headers("Set-Cookie");
-            String passId = null;
-            for (String cookie : cookies) {
-                try {
-                    List<HttpCookie> parsedList = HttpCookie.parse(cookie);
-                    for (HttpCookie parsed : parsedList) {
-                        if (parsed.getName().equals("pass_id") && !parsed.getValue().equals("0")) {
-                            passId = parsed.getValue();
-                        }
-                    }
-                } catch (IllegalArgumentException ignored) {
-                }
+        String message = "Unknown error";
+        try {
+            Document document = HTML_CONVERTER.convert(response);
+            Elements found = new Elements();
+            found.addAll(document.select(".msg-error:not(.hidden)"));
+            boolean success = found.addAll(document.select(".msg-success:not(.hidden)"));
+            Element responseMessage = found.first();
+            if (responseMessage != null) {
+                message = responseMessage.text();
             }
-
-            if (passId != null) {
-                loginResponse.token = passId;
-                loginResponse.message = "Success! Your device is now authorized.";
-                loginResponse.success = true;
-            } else {
-                loginResponse.message = "Could not get pass id";
-            }
+            return new LoginResponse(message, success);
+        } catch (Exception e) {
+            return new LoginResponse(message, false);
         }
     }
 }

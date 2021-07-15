@@ -22,20 +22,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     android:background="?backcolor"
     android:orientation="vertical">
 
-    <LinearLayout
+    <androidx.viewpager2.widget.ViewPager2
+        android:id="@+id/pager"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical">
-
-        <androidx.viewpager.widget.ViewPager
-            android:id="@+id/pager"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingHorizontal="12dp" />
-
-    </LinearLayout>
+        android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:clipChildren="false"/>
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/add"

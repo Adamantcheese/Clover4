@@ -25,6 +25,8 @@ import com.github.adamantcheese.chan.BuildConfig;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
 import com.github.adamantcheese.chan.utils.StringUtils;
 
+import java.util.Objects;
+
 import okhttp3.HttpUrl;
 
 import static com.github.adamantcheese.chan.core.model.PostImage.Type.GIF;
@@ -70,7 +72,7 @@ public class PostImage {
         this.extension = builder.extension;
         this.imageWidth = builder.imageWidth;
         this.imageHeight = builder.imageHeight;
-        this.spoiler = builder.spoiler;
+        this.spoiler = builder.spoiler && !builder.deleted;
         this.isInlined = builder.isInlined;
         this.size = builder.size;
         this.fileHash = builder.fileHash;
@@ -87,6 +89,7 @@ public class PostImage {
             case "m4a":
             case "ogg":
             case "flac":
+            case "wav":
                 type = MOVIE;
                 break;
             case "pdf":
@@ -124,6 +127,11 @@ public class PostImage {
         if (o == null || getClass() != o.getClass()) return false;
         PostImage image = (PostImage) o;
         return imageUrl.equals(image.imageUrl);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(imageUrl);
     }
 
     public static final class Builder {

@@ -40,30 +40,32 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
-import android.telephony.TelephonyManager;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.ContextThemeWrapper;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.browser.customtabs.CustomTabColorSchemeParams;
 import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.preference.PreferenceManager;
 
 import com.github.adamantcheese.chan.R;
+import com.github.adamantcheese.chan.StartActivity;
+import com.github.adamantcheese.chan.core.settings.ChanSettings;
 import com.skydoves.balloon.Balloon;
 
 import org.greenrobot.eventbus.EventBus;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 import static android.content.Context.AUDIO_SERVICE;
@@ -78,7 +80,6 @@ import static android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT;
 import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
 
 public class AndroidUtils {
-    private static final String TAG = "AndroidUtils";
     private static final String CHAN_STATE_PREFS_NAME = "chan_state";
 
     @SuppressLint("StaticFieldLeak")
@@ -98,11 +99,12 @@ public class AndroidUtils {
         return application;
     }
 
+    @NonNull
     public static String getString(int res) {
         try {
             return getRes().getString(res);
         } catch (Exception e) {
-            return null;
+            return e.getMessage() == null ? "UNKNOWN" : e.getMessage();
         }
     }
 
@@ -118,14 +120,6 @@ public class AndroidUtils {
         return getRes().getQuantityString(res, quantity, formatArgs);
     }
 
-    public static String getApplicationLabel() {
-        return application.getPackageManager().getApplicationLabel(application.getApplicationInfo()).toString();
-    }
-
-    public static String getAppFileProvider() {
-        return application.getPackageName() + ".fileprovider";
-    }
-
     public static SharedPreferences getPreferences() {
         return PreferenceManager.getDefaultSharedPreferences(application);
     }
@@ -135,8 +129,24 @@ public class AndroidUtils {
     }
 
     public static boolean isEmulator() {
-        return Build.MODEL.contains("google_sdk") || Build.MODEL.contains("Emulator") || Build.MODEL.contains(
-                "Android SDK");
+        //@formatter:off
+        return (Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic"))
+                || Build.FINGERPRINT.startsWith("generic")
+                || Build.FINGERPRINT.startsWith("unknown")
+                || Build.HARDWARE.contains("goldfish")
+                || Build.HARDWARE.contains("ranchu")
+                || Build.MODEL.contains("google_sdk")
+                || Build.MODEL.contains("Emulator")
+                || Build.MODEL.contains("Android SDK built for x86")
+                || Build.MANUFACTURER.contains("Genymotion")
+                || Build.PRODUCT.contains("sdk_google")
+                || Build.PRODUCT.contains("google_sdk")
+                || Build.PRODUCT.contains("sdk")
+                || Build.PRODUCT.contains("sdk_x86")
+                || Build.PRODUCT.contains("vbox86p")
+                || Build.PRODUCT.contains("emulator")
+                || Build.PRODUCT.contains("simulator");
+        //@formatter:on
     }
 
     /**
@@ -186,6 +196,12 @@ public class AndroidUtils {
         }
     }
 
+    /**
+     * Tries to open a link in a custom tab.
+     *
+     * @param context Context for activity resolution
+     * @param link    url to open
+     */
     public static void openLinkInBrowser(Context context, String link) {
         if (TextUtils.isEmpty(link)) {
             showToast(context, R.string.open_link_failed);
@@ -327,6 +343,17 @@ public class AndroidUtils {
         }
     }
 
+    // Clears selection popups and soft keyboards from whatever they'e currently on
+    public static void clearAnySelectionsAndKeyboards(Context context) {
+        try {
+            View currentFocus = ((StartActivity) context).getContentView().getFocusedChild();
+            if (currentFocus != null) {
+                hideKeyboard(currentFocus);
+                currentFocus.clearFocus();
+            }
+        } catch (Exception ignored) {}
+    }
+
     /**
      * Specify -1 to leave that padding the same as before.
      */
@@ -354,128 +381,6 @@ public class AndroidUtils {
         view.setPadding(newLeft, newTop, newRight, newBottom);
     }
 
-    public interface OnMeasuredCallback {
-        /**
-         * Called when the layout is done.
-         *
-         * @param view same view as the argument.
-         * @return true to continue with rendering, false to cancel and redo the layout.
-         */
-        boolean onMeasured(View view);
-    }
-
-    /**
-     * Waits for a measure. Calls callback immediately if the view width and height are more than 0.
-     * Otherwise it registers an onpredrawlistener.
-     * <b>Warning: the view you give must be attached to the view root!</b>
-     */
-    public static void waitForMeasure(final View view, final OnMeasuredCallback callback) {
-        if (view.getWindowToken() == null) {
-            // If you call getViewTreeObserver on a view when it's not attached to a window will result in the creation of a temporarily viewtreeobserver.
-            view.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) {
-                    waitForLayoutInternal(true, view.getViewTreeObserver(), view, callback);
-                    view.removeOnAttachStateChangeListener(this);
-                }
-
-                @Override
-                public void onViewDetachedFromWindow(View v) {
-                    view.removeOnAttachStateChangeListener(this);
-                }
-            });
-            return;
-        }
-
-        waitForLayoutInternal(true, view.getViewTreeObserver(), view, callback);
-    }
-
-    /**
-     * Always registers an onpredrawlistener.
-     * <b>Warning: the view you give must be attached to the view root!</b>
-     */
-    public static void waitForLayout(final View view, final OnMeasuredCallback callback) {
-        if (view.getWindowToken() == null) {
-            // See comment above
-            view.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) {
-                    waitForLayoutInternal(true, view.getViewTreeObserver(), view, callback);
-                    view.removeOnAttachStateChangeListener(this);
-                }
-
-                @Override
-                public void onViewDetachedFromWindow(View v) {
-                    view.removeOnAttachStateChangeListener(this);
-                }
-            });
-            return;
-        }
-
-        waitForLayoutInternal(false, view.getViewTreeObserver(), view, callback);
-    }
-
-    /**
-     * Always registers an onpredrawlistener. The given ViewTreeObserver will be used.
-     */
-    public static void waitForLayout(
-            final ViewTreeObserver viewTreeObserver, final View view, final OnMeasuredCallback callback
-    ) {
-        waitForLayoutInternal(false, viewTreeObserver, view, callback);
-    }
-
-    private static void waitForLayoutInternal(
-            boolean returnIfNotZero,
-            final ViewTreeObserver viewTreeObserver,
-            final View view,
-            final OnMeasuredCallback callback
-    ) {
-        int width = view.getWidth();
-        int height = view.getHeight();
-
-        if (returnIfNotZero && width > 0 && height > 0 && view.isLaidOut()) {
-            callback.onMeasured(view);
-        } else {
-            viewTreeObserver.addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
-                private ViewTreeObserver usingViewTreeObserver = viewTreeObserver;
-
-                @Override
-                public boolean onPreDraw() {
-                    if (usingViewTreeObserver != view.getViewTreeObserver()) {
-                        Logger.ve(
-                                TAG,
-                                "view.getViewTreeObserver() is another viewtreeobserver! replacing with the new one"
-                        );
-                        usingViewTreeObserver = view.getViewTreeObserver();
-                    }
-
-                    if (usingViewTreeObserver.isAlive()) {
-                        usingViewTreeObserver.removeOnPreDrawListener(this);
-                    } else {
-                        Logger.e(
-                                TAG,
-                                "ViewTreeObserver not alive, could not remove onPreDrawListener! This will probably not end well"
-                        );
-                    }
-
-                    boolean ret;
-                    try {
-                        ret = callback.onMeasured(view);
-                    } catch (Exception e) {
-                        Logger.e(TAG, "Exception in onMeasured", e);
-                        throw e;
-                    }
-
-                    if (!ret) {
-                        Logger.vd(TAG, "waitForLayout requested a re-layout by returning false");
-                    }
-
-                    return ret;
-                }
-            });
-        }
-    }
-
     public static boolean removeFromParentView(View view) {
         if (view.getParent() instanceof ViewGroup && ((ViewGroup) view.getParent()).indexOfChild(view) >= 0) {
             ((ViewGroup) view.getParent()).removeView(view);
@@ -486,9 +391,7 @@ public class AndroidUtils {
     }
 
     public static boolean isConnected(int type) {
-        ConnectivityManager connectivityManager =
-                (ConnectivityManager) application.getSystemService(Context.CONNECTIVITY_SERVICE);
-        NetworkInfo networkInfo = connectivityManager.getNetworkInfo(type);
+        NetworkInfo networkInfo = getConnectivityManager().getNetworkInfo(type);
         return networkInfo != null && networkInfo.isConnected();
     }
 
@@ -570,6 +473,11 @@ public class AndroidUtils {
         return (AudioManager) getAppContext().getSystemService(AUDIO_SERVICE);
     }
 
+    public static boolean getDefaultMuteState() {
+        return ChanSettings.videoDefaultMuted.get() && (ChanSettings.headsetDefaultMuted.get()
+                || !getAudioManager().isWiredHeadsetOn());
+    }
+
     public static void postToEventBus(Object message) {
         EventBus.getDefault().post(message);
     }
@@ -587,54 +495,9 @@ public class AndroidUtils {
         return screenOrientation;
     }
 
-    /**
-     * Change to ConnectivityManager#registerDefaultNetworkCallback when minSdk == 24, basically never
-     */
-    public static String getNetworkClass() {
-        ConnectivityManager connectivityManager = getConnectivityManager();
-        if (connectivityManager == null) {
-            return "No Connectivity Manager Service";
-        }
-        NetworkInfo info = connectivityManager.getActiveNetworkInfo();
-        if (info == null || !info.isConnected()) {
-            return "No connected"; // not connected
-        }
-
-        if (info.getType() == ConnectivityManager.TYPE_WIFI) {
-            return "WIFI";
-        }
-
-        if (info.getType() == ConnectivityManager.TYPE_MOBILE) {
-            int networkType = info.getSubtype();
-            switch (networkType) {
-                case TelephonyManager.NETWORK_TYPE_GPRS:
-                case TelephonyManager.NETWORK_TYPE_EDGE:
-                case TelephonyManager.NETWORK_TYPE_CDMA:
-                case TelephonyManager.NETWORK_TYPE_1xRTT:
-                case TelephonyManager.NETWORK_TYPE_IDEN:     // api< 8: replace by 11
-                case TelephonyManager.NETWORK_TYPE_GSM:      // api<25: replace by 16
-                    return "2G";
-                case TelephonyManager.NETWORK_TYPE_UMTS:
-                case TelephonyManager.NETWORK_TYPE_EVDO_0:
-                case TelephonyManager.NETWORK_TYPE_EVDO_A:
-                case TelephonyManager.NETWORK_TYPE_HSDPA:
-                case TelephonyManager.NETWORK_TYPE_HSUPA:
-                case TelephonyManager.NETWORK_TYPE_HSPA:
-                case TelephonyManager.NETWORK_TYPE_EVDO_B:   // api< 9: replace by 12
-                case TelephonyManager.NETWORK_TYPE_EHRPD:    // api<11: replace by 14
-                case TelephonyManager.NETWORK_TYPE_HSPAP:    // api<13: replace by 15
-                case TelephonyManager.NETWORK_TYPE_TD_SCDMA: // api<25: replace by 17
-                    return "3G";
-                case TelephonyManager.NETWORK_TYPE_LTE:      // api<11: replace by 13
-                case TelephonyManager.NETWORK_TYPE_IWLAN:    // api<25: replace by 18
-                case 19: // LTE_CA
-                    return "4G";
-                case TelephonyManager.NETWORK_TYPE_NR:       // api<29: replace by 20
-                    return "5G";
-            }
-        }
-
-        return "Unknown";
+    public static boolean isAprilFoolsDay() {
+        Calendar calendar = Calendar.getInstance();
+        return calendar.get(Calendar.MONTH) == Calendar.APRIL && calendar.get(Calendar.DAY_OF_MONTH) == 1;
     }
 
     /**

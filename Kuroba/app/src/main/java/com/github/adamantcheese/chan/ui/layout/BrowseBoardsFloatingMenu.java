@@ -21,7 +21,6 @@ import android.animation.AnimatorListenerAdapter;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Point;
-import android.graphics.drawable.Drawable;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
@@ -30,7 +29,6 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.view.animation.DecelerateInterpolator;
 import android.view.animation.Interpolator;
 import android.widget.EditText;
@@ -39,6 +37,7 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.core.view.OneShotPreDrawListener;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.recyclerview.widget.RecyclerView.ViewHolder;
@@ -48,9 +47,6 @@ import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.presenter.BoardsMenuPresenter;
 import com.github.adamantcheese.chan.core.presenter.BoardsMenuPresenter.Item;
 import com.github.adamantcheese.chan.core.site.Site;
-import com.github.adamantcheese.chan.core.site.SiteIcon;
-import com.github.adamantcheese.chan.core.site.common.CommonSite;
-import com.github.adamantcheese.chan.ui.helper.BoardHelper;
 import com.github.adamantcheese.chan.ui.theme.ThemeHelper;
 import com.github.adamantcheese.chan.utils.RecyclerUtils;
 
@@ -94,7 +90,7 @@ public class BrowseBoardsFloatingMenu
     private BrowseBoardsAdapter adapter;
 
     private ClickCallback clickCallback;
-    private final ViewTreeObserver.OnGlobalLayoutListener layoutListener = this::repositionToAnchor;
+    private OneShotPreDrawListener repositionListener;
 
     public BrowseBoardsFloatingMenu(Context context) {
         this(context, null);
@@ -119,7 +115,18 @@ public class BrowseBoardsFloatingMenu
 
         ViewGroup rootView = baseView.getRootView().findViewById(android.R.id.content);
 
-        setupChildViews();
+        // View creation
+        recyclerView = new RecyclerView(getContext());
+
+        // View setup
+        recyclerView.setBackgroundColor(getAttrColor(getContext(), R.attr.backcolor));
+        recyclerView.setElevation(dp(4));
+
+        // View attaching
+        int recyclerWidth = Math.max(anchor.getWidth(), dp(4 * 56));
+        LayoutParams params = new LayoutParams(recyclerWidth, WRAP_CONTENT);
+        params.setMargins(dp(5), dp(5), dp(5), dp(5));
+        addView(recyclerView, params);
 
         adapter = new BrowseBoardsAdapter();
 
@@ -135,24 +142,9 @@ public class BrowseBoardsFloatingMenu
 
         animateIn();
 
-        presenter.create(this, selectedBoard);
+        presenter.create(this, selectedBoard, getContext());
         items = presenter.items();
         items.addObserver(this);
-
-        if (items.items.size() == 1) {
-            CommonSite setupSite = new CommonSite() {
-                @Override
-                public void setup() {
-                    setName("App Setup");
-                    @SuppressLint("UseCompatLoadingForDrawables")
-                    Drawable settingsDrawable = getContext().getDrawable(R.drawable.ic_fluent_settings_24_filled);
-                    settingsDrawable.setTint(getAttrColor(getContext(), android.R.attr.textColorSecondary));
-                    setIcon(SiteIcon.fromDrawable(settingsDrawable));
-                }
-            };
-            setupSite.setup();
-            items.items.add(new Item(1, setupSite));
-        }
 
         // items should exist before this is added
         recyclerView.addItemDecoration(RecyclerUtils.getDividerDecoration(getContext(),
@@ -212,7 +204,10 @@ public class BrowseBoardsFloatingMenu
 
         hideKeyboard(this);
 
-        anchor.getViewTreeObserver().removeOnGlobalLayoutListener(layoutListener);
+        if (repositionListener != null) {
+            repositionListener.removeListener();
+            repositionListener = null;
+        }
 
         if (animated) {
             animateOut(() -> removeFromParentView(this));
@@ -221,24 +216,9 @@ public class BrowseBoardsFloatingMenu
         }
     }
 
-    private void setupChildViews() {
-        // View creation
-        recyclerView = new RecyclerView(getContext());
-
-        // View setup
-        recyclerView.setBackgroundColor(getAttrColor(getContext(), R.attr.backcolor));
-        recyclerView.setElevation(dp(4));
-
-        // View attaching
-        int recyclerWidth = Math.max(anchor.getWidth(), dp(4 * 56));
-        LayoutParams params = new LayoutParams(recyclerWidth, WRAP_CONTENT);
-        params.setMargins(dp(5), dp(5), dp(5), dp(5));
-        addView(recyclerView, params);
-    }
-
     private void watchAnchor() {
         repositionToAnchor();
-        anchor.getViewTreeObserver().addOnGlobalLayoutListener(layoutListener);
+        repositionListener = OneShotPreDrawListener.add(anchor, this::repositionToAnchor);
     }
 
     private void repositionToAnchor() {
@@ -469,7 +449,7 @@ public class BrowseBoardsFloatingMenu
         public void bind(Board board) {
             this.board = board;
             itemView.setOnClickListener(v -> itemClicked(null, board));
-            text.setText(BoardHelper.getName(board));
+            text.setText(board.getFormattedName());
         }
     }
 

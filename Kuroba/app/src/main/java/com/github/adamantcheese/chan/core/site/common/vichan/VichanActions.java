@@ -16,12 +16,10 @@
  */
 package com.github.adamantcheese.chan.core.site.common.vichan;
 
-import android.util.JsonReader;
-
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.net.NetUtils;
-import com.github.adamantcheese.chan.core.net.NetUtilsClasses.JSONProcessor;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
 import com.github.adamantcheese.chan.core.net.NetUtilsClasses.ResponseResult;
 import com.github.adamantcheese.chan.core.site.SiteAuthentication;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.ChanPages;
@@ -36,6 +34,7 @@ import com.github.adamantcheese.chan.utils.Logger;
 
 import org.jsoup.Jsoup;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -53,7 +52,7 @@ public class VichanActions
     }
 
     @Override
-    public void setupPost(Loadable loadable, MultipartHttpCall call) {
+    public void setupPost(Loadable loadable, MultipartHttpCall<ReplyResponse> call) {
         Reply reply = loadable.draft;
         call.parameter("board", loadable.boardCode);
 
@@ -84,26 +83,41 @@ public class VichanActions
     }
 
     @Override
-    public boolean requirePrepare() {
-        return true;
-    }
-
-    @Override
-    public void prepare(MultipartHttpCall call, ReplyResponse replyResponse) {
-        VichanAntispam antispam = new VichanAntispam(HttpUrl.parse(replyResponse.originatingLoadable.desktopUrl()));
+    public void prepare(
+            MultipartHttpCall<ReplyResponse> call,
+            Loadable loadable,
+            NetUtilsClasses.ResponseResult<Void> callback
+    ) {
+        VichanAntispam antispam = new VichanAntispam(HttpUrl.parse(loadable.desktopUrl()));
         antispam.addDefaultIgnoreFields();
-        for (Map.Entry<String, String> e : antispam.get().entrySet()) {
-            call.parameter(e.getKey(), e.getValue());
-        }
+        antispam.get(new ResponseResult<Map<String, String>>() {
+            @Override
+            public void onFailure(Exception e) {
+                callback.onFailure(e);
+            }
+
+            @Override
+            public void onSuccess(Map<String, String> result) {
+                for (Map.Entry<String, String> e : result.entrySet()) {
+                    call.parameter(e.getKey(), e.getValue());
+                }
+                callback.onSuccess(null);
+            }
+        });
     }
 
     @Override
-    public void handlePost(ReplyResponse replyResponse, Response response, String result) {
-        Matcher auth = Pattern.compile("\"captcha\": ?true").matcher(result);
-        Matcher err = errorPattern().matcher(result);
+    public ReplyResponse handlePost(Loadable loadable, Response response) {
+        ReplyResponse replyResponse = new ReplyResponse(loadable);
+        String responseString = "";
+        try {
+            responseString = response.body().string();
+        } catch (Exception ignored) {}
+        Matcher auth = Pattern.compile("\"captcha\": ?true").matcher(responseString);
+        Matcher err = errorPattern().matcher(responseString);
         if (auth.find()) {
             replyResponse.requireAuthentication = true;
-            replyResponse.errorMessage = result;
+            replyResponse.errorMessage = responseString;
         } else if (err.find()) {
             replyResponse.errorMessage = Jsoup.parse(err.group(1)).body().text();
         } else {
@@ -127,10 +141,11 @@ public class VichanActions
                 replyResponse.errorMessage = "Error posting: could not find posted thread.";
             }
         }
+        return replyResponse;
     }
 
     @Override
-    public void setupDelete(DeleteRequest deleteRequest, MultipartHttpCall call) {
+    public void setupDelete(DeleteRequest deleteRequest, MultipartHttpCall<DeleteResponse> call) {
         call.parameter("board", deleteRequest.post.board.code);
         call.parameter("delete", "Delete");
         call.parameter("delete_" + deleteRequest.post.no, "on");
@@ -142,13 +157,16 @@ public class VichanActions
     }
 
     @Override
-    public void handleDelete(DeleteResponse response, Response httpResponse, String responseBody) {
-        Matcher err = errorPattern().matcher(responseBody);
+    public DeleteResponse handleDelete(Response httpResponse)
+            throws IOException {
+        DeleteResponse response = new DeleteResponse();
+        Matcher err = errorPattern().matcher(httpResponse.body().string());
         if (err.find()) {
             response.errorMessage = Jsoup.parse(err.group(1)).body().text();
         } else {
             response.deleted = true;
         }
+        return response;
     }
 
     public Pattern errorPattern() {
@@ -156,32 +174,30 @@ public class VichanActions
     }
 
     @Override
-    public SiteAuthentication postAuthenticate() {
+    public SiteAuthentication postAuthenticate(Loadable loadableWithDraft) {
         return SiteAuthentication.fromNone();
     }
 
     @Override
-    public void pages(Board board, PagesListener pagesListener) {
+    public void pages(Board board, ResponseResult<ChanPages> pagesListener) {
         // Vichan keeps the pages and the catalog as one JSON unit, so parse those here
-        NetUtils.makeJsonRequest(site.endpoints().catalog(board), new ResponseResult<ChanPages>() {
-            @Override
-            public void onFailure(Exception e) {
-                Logger.e(site, "Failed to get pages for board " + board.code, e);
-                pagesListener.onPagesReceived(board, new ChanPages());
-            }
+        NetUtils.makeJsonRequest(site.endpoints().catalog(board),
+                new ResponseResult<ChanPages>() {
+                    @Override
+                    public void onFailure(Exception e) {
+                        Logger.e(site, "Failed to get pages for board " + board.code, e);
+                        pagesListener.onSuccess(new ChanPages());
+                    }
 
-            @Override
-            public void onSuccess(ChanPages result) {
-                pagesListener.onPagesReceived(board, result);
-            }
-        }, new JSONProcessor<ChanPages>() {
-            @Override
-            public ChanPages process(JsonReader response)
-                    throws Exception {
-                return ((VichanApi) site.chanReader()).readCatalogWithPages(response,
+                    @Override
+                    public void onSuccess(ChanPages result) {
+                        pagesListener.onSuccess(result);
+                    }
+                },
+                response -> ((VichanApi) site.chanReader()).readCatalogWithPages(response,
                         new ChanReaderProcessingQueue(new ArrayList<>(), Loadable.forCatalog(board))
-                );
-            }
-        });
+                ),
+                NetUtilsClasses.NO_CACHE
+        );
     }
 }

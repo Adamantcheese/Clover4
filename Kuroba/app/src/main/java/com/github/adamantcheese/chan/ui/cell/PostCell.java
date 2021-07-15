@@ -20,10 +20,7 @@ import android.app.SearchManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Paint;
 import android.graphics.Rect;
-import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.text.Layout;
 import android.text.Spannable;
@@ -34,11 +31,11 @@ import android.text.format.DateUtils;
 import android.text.method.LinkMovementMethod;
 import android.text.style.BackgroundColorSpan;
 import android.text.style.ClickableSpan;
+import android.text.style.StyleSpan;
 import android.text.style.UnderlineSpan;
 import android.util.AttributeSet;
 import android.view.ActionMode;
 import android.view.GestureDetector;
-import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
@@ -50,14 +47,15 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.constraintlayout.widget.ConstraintLayout;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.github.adamantcheese.chan.R;
-import com.github.adamantcheese.chan.core.cache.CacheHandler;
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.PostHttpIcon;
 import com.github.adamantcheese.chan.core.model.PostImage;
 import com.github.adamantcheese.chan.core.model.PostLinkable;
+import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.net.NetUtils;
 import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
@@ -66,8 +64,7 @@ import com.github.adamantcheese.chan.core.repository.PageRepository;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.ChanPage;
-import com.github.adamantcheese.chan.features.embedding.EmbeddingEngine;
-import com.github.adamantcheese.chan.features.embedding.EmbeddingEngine.InvalidateFunction;
+import com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions;
 import com.github.adamantcheese.chan.ui.helper.PostHelper;
 import com.github.adamantcheese.chan.ui.text.AbsoluteSizeSpanHashed;
 import com.github.adamantcheese.chan.ui.text.ForegroundColorSpanHashed;
@@ -76,39 +73,36 @@ import com.github.adamantcheese.chan.ui.view.FloatingMenu;
 import com.github.adamantcheese.chan.ui.view.FloatingMenuItem;
 import com.github.adamantcheese.chan.ui.view.PostImageThumbnailView;
 import com.github.adamantcheese.chan.ui.view.ThumbnailView;
+import com.github.adamantcheese.chan.utils.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
 
-import okhttp3.Call;
 import okhttp3.HttpUrl;
 
 import static android.text.TextUtils.isEmpty;
-import static android.view.View.MeasureSpec.EXACTLY;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
-import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
-import static android.widget.RelativeLayout.ALIGN_PARENT_BOTTOM;
-import static android.widget.RelativeLayout.ALIGN_PARENT_RIGHT;
 import static android.widget.RelativeLayout.BELOW;
 import static android.widget.RelativeLayout.RIGHT_OF;
-import static com.github.adamantcheese.chan.Chan.instance;
 import static com.github.adamantcheese.chan.core.settings.ChanSettings.getThumbnailSize;
+import static com.github.adamantcheese.chan.core.site.SiteEndpoints.ICON_TYPE.OTHER;
 import static com.github.adamantcheese.chan.ui.adapter.PostsFilter.Order.isNotBumpOrder;
+import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.dp;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrColor;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getQuantityString;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.openIntent;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.setClipboardContent;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.sp;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.waitForLayout;
 import static com.github.adamantcheese.chan.utils.PostUtils.getReadableFileSize;
 import static com.github.adamantcheese.chan.utils.StringUtils.applySearchSpans;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class PostCell
         extends LinearLayout
-        implements PostCellInterface, InvalidateFunction {
+        implements PostCellInterface {
     private static final int COMMENT_MAX_LINES_BOARD = 25;
 
     private RecyclerView thumbnailViews;
@@ -118,26 +112,23 @@ public class PostCell
     private TextView replies;
     private View filterMatchColor;
 
+    private RelativeLayout headerWrapper;
+    private ConstraintLayout bodyWrapper;
+
     private int detailsSizePx;
     private int iconSizePx;
-    private int paddingPx;
     private boolean threadMode;
     private boolean ignoreNextOnClick;
 
-    private boolean bound = false;
     private Loadable loadable;
     private Post post;
     private PostCellCallback callback;
     private boolean inPopup;
     private boolean highlighted;
-    private int markedNo;
-    private String searchQuery;
 
     private GestureDetector doubleTapComment;
 
     private final PostViewMovementMethod commentMovementMethod = new PostViewMovementMethod();
-
-    private final List<Call> embedCalls = new CopyOnWriteArrayList<>();
 
     public PostCell(Context context) {
         super(context);
@@ -163,43 +154,61 @@ public class PostCell
         ImageView options = findViewById(R.id.options);
         filterMatchColor = findViewById(R.id.filter_match_color);
 
-        if (!isInEditMode()) {
-            int textSizeSp = ChanSettings.fontSize.get();
-            paddingPx = dp(textSizeSp - 7);
-            detailsSizePx = sp(textSizeSp - 4);
+        headerWrapper = findViewById(R.id.header_wrapper);
+        bodyWrapper = findViewById(R.id.body_wrapper);
 
-            thumbnailViews.addItemDecoration(new DPSpacingItemDecoration(2));
-            ((MarginLayoutParams) thumbnailViews.getLayoutParams()).setMargins(paddingPx, paddingPx, 0, paddingPx);
+        int textSizeSp = isInEditMode() ? 15 : ChanSettings.fontSize.get();
+        int paddingPx = dp(getContext(), textSizeSp - 7);
+        detailsSizePx = sp(getContext(), textSizeSp - 4);
 
-            title.setTextSize(textSizeSp);
-            title.setPadding(paddingPx, paddingPx - dp(2), dp(16), 0);
+        thumbnailViews.addItemDecoration(new DPSpacingItemDecoration(getContext(), 2));
+        ((MarginLayoutParams) thumbnailViews.getLayoutParams()).setMargins(paddingPx, paddingPx, 0, paddingPx);
 
-            iconSizePx = sp(textSizeSp - 3);
-            icons.setHeight(sp(textSizeSp));
-            icons.setSpacing(dp(4));
-            icons.setPadding(paddingPx, dp(4), paddingPx, 0);
+        title.setTextSize(textSizeSp);
+        title.setPadding(paddingPx, paddingPx, dp(getContext(), 24), paddingPx / 2);
 
-            comment.setTextSize(textSizeSp);
-            comment.setPadding(paddingPx, paddingPx, paddingPx, paddingPx);
+        iconSizePx = sp(getContext(), textSizeSp);
+        icons.setHeight(iconSizePx);
+        icons.setSpacing(dp(getContext(), 4));
+        icons.setPadding(paddingPx, 0, dp(getContext(), 24), 0);
 
-            replies.setTextSize(textSizeSp);
-            replies.setPadding(paddingPx, 0, paddingPx, paddingPx);
+        if (isInEditMode()) {
+            BitmapRepository.initialize(getContext());
+            icons.setWithText(new Post.Builder().sticky(true)
+                    .closed(true)
+                    .archived(true)
+                    .board(Board.getDummyBoard())
+                    .no(1)
+                    .opId(1)
+                    .setUnixTimestampSeconds(System.currentTimeMillis())
+                    .comment("")
+                    .addHttpIcon(new PostHttpIcon(OTHER, null, new NetUtilsClasses.PassthroughBitmapResult() {
+                        @Override
+                        public void onBitmapSuccess(
+                                @NonNull HttpUrl source, @NonNull Bitmap bitmap, boolean fromCache
+                        ) {
+                            super.onBitmapSuccess(source, BitmapRepository.youtubeIcon, fromCache);
+                        }
+                    }, "", ""))
+                    .build(), iconSizePx);
         }
 
-        OnClickListener repliesClickListener = v -> {
+        comment.setTextSize(textSizeSp);
+        comment.setPadding(paddingPx, paddingPx / 2, paddingPx, paddingPx);
+
+        replies.setTextSize(textSizeSp);
+        replies.setPadding(paddingPx, paddingPx / 2, paddingPx, paddingPx);
+        replies.setOnClickListener(v -> {
             if (replies.getVisibility() != VISIBLE || !threadMode) {
                 return;
             }
 
-            if (post.repliesFrom.size() > 0) {
-                callback.onShowPostReplies(post);
-            }
-        };
-        replies.setOnClickListener(repliesClickListener);
+            callback.onShowPostReplies(post);
+        });
 
         options.setOnClickListener(v -> {
-            List<FloatingMenuItem<Integer>> items = new ArrayList<>();
-            List<FloatingMenuItem<Integer>> extraItems = new ArrayList<>();
+            List<FloatingMenuItem<PostOptions>> items = new ArrayList<>();
+            List<FloatingMenuItem<PostOptions>> extraItems = new ArrayList<>();
             Object extraOption = callback.onPopulatePostOptions(post, items, extraItems);
             showOptions(v, items, extraItems, extraOption);
         });
@@ -217,14 +226,14 @@ public class PostCell
 
     private void showOptions(
             View anchor,
-            List<FloatingMenuItem<Integer>> items,
-            List<FloatingMenuItem<Integer>> extraItems,
+            List<FloatingMenuItem<PostOptions>> items,
+            List<FloatingMenuItem<PostOptions>> extraItems,
             Object extraOption
     ) {
-        FloatingMenu<Integer> menu = new FloatingMenu<>(getContext(), anchor, items);
-        menu.setCallback(new FloatingMenu.ClickCallback<Integer>() {
+        FloatingMenu<PostOptions> menu = new FloatingMenu<>(getContext(), anchor, items);
+        menu.setCallback(new FloatingMenu.ClickCallback<PostOptions>() {
             @Override
-            public void onFloatingMenuItemClicked(FloatingMenu<Integer> menu, FloatingMenuItem<Integer> item) {
+            public void onFloatingMenuItemClicked(FloatingMenu<PostOptions> menu, FloatingMenuItem<PostOptions> item) {
                 if (item.getId() == extraOption) {
                     showOptions(anchor, extraItems, null, null);
                 }
@@ -238,27 +247,16 @@ public class PostCell
     public void setPost(
             Loadable loadable,
             final Post post,
-            PostCellInterface.PostCellCallback callback,
+            PostCellCallback callback,
             boolean inPopup,
             boolean highlighted,
-            int markedNo,
-            ChanSettings.PostViewMode postViewMode,
             boolean compact,
-            String searchQuery,
             Theme theme
     ) {
-        if (this.post != null && bound) {
-            unbindPost(this.post);
-            this.post = null;
-        }
-
         this.loadable = loadable;
-        this.post = post;
         this.callback = callback;
         this.inPopup = inPopup;
         this.highlighted = highlighted;
-        this.markedNo = markedNo;
-        this.searchQuery = searchQuery;
 
         bindPost(theme, post);
 
@@ -272,15 +270,9 @@ public class PostCell
     }
 
     public ThumbnailView getThumbnailView(PostImage postImage) {
-        for (PostImage image : post.images) {
-            if (image.equals(postImage)) {
-                return ChanSettings.textOnly.get()
-                        ? null
-                        : (ThumbnailView) thumbnailViews.findViewHolderForLayoutPosition(post.images.indexOf(image)).itemView;
-            }
-        }
-
-        return null;
+        int pos = post.images.indexOf(postImage);
+        RecyclerView.ViewHolder foundView = thumbnailViews.findViewHolderForLayoutPosition(pos);
+        return (ChanSettings.textOnly.get() || foundView == null) ? null : (ThumbnailView) foundView.itemView;
     }
 
     @Override
@@ -289,12 +281,10 @@ public class PostCell
     }
 
     private void bindPost(Theme theme, Post post) {
-        bound = true;
+        this.post = post;
 
         // Assume that we're in thread mode if the loadable is null
         threadMode = callback.getLoadable() == null || callback.getLoadable().isThreadMode();
-
-        setPostLinkableListener(post, true);
 
         replies.setClickable(threadMode);
 
@@ -317,30 +307,34 @@ public class PostCell
             filterMatchColor.setVisibility(GONE);
         }
 
-        thumbnailViews.swapAdapter(new PostImagesAdapter(), false);
         if (post.images.isEmpty() || ChanSettings.textOnly.get()) {
             thumbnailViews.setVisibility(GONE);
         } else {
+            thumbnailViews.setAdapter(new PostImagesAdapter());
             thumbnailViews.setVisibility(VISIBLE);
         }
 
         SpannableStringBuilder titleParts = new SpannableStringBuilder();
 
         if (post.subjectSpan != null) {
-            titleParts.append(applySearchSpans(post.subjectSpan, searchQuery)).append("\n");
+            titleParts.append(applySearchSpans(theme, post.subjectSpan, callback.getSearchQuery())).append("\n");
         }
-        titleParts.append(applySearchSpans(post.nameTripcodeIdCapcodeSpan, searchQuery));
+        titleParts.append(applySearchSpans(theme, post.nameTripcodeIdCapcodeSpan, callback.getSearchQuery()));
 
         int detailsColor = getAttrColor(getContext(), R.attr.post_details_color);
-        SpannableString date = new SpannableString(
-                "No. " + post.no + (ChanSettings.addDubs.get() ? " " + getRepeatDigits(post.no) : "") + " " + (
-                        ChanSettings.postFullDate.get()
-                                ? PostHelper.getLocalDate(post)
-                                : DateUtils.getRelativeTimeSpanString(post.time * 1000L,
-                                        System.currentTimeMillis(),
-                                        DateUtils.SECOND_IN_MILLIS,
-                                        0
-                                )));
+        CharSequence dubs = ChanSettings.addDubs.get() ? getRepeatDigits(post.no) : "";
+        SpannableStringBuilder date = new SpannableStringBuilder().append("No. ")
+                .append(String.valueOf(post.no))
+                .append(" ")
+                .append(dubs)
+                .append(ChanSettings.addDubs.get() ? (dubs.length() > 0 ? " " : "") : "")
+                .append(ChanSettings.postFullDate.get()
+                        ? PostHelper.getLocalDate(post)
+                        : DateUtils.getRelativeTimeSpanString(SECONDS.toMillis(post.time),
+                                System.currentTimeMillis(),
+                                DateUtils.SECOND_IN_MILLIS,
+                                0
+                        ));
         date.setSpan(new ForegroundColorSpanHashed(detailsColor), 0, date.length(), 0);
         date.setSpan(new AbsoluteSizeSpanHashed(detailsSizePx), 0, date.length(), 0);
 
@@ -354,8 +348,8 @@ public class PostCell
                 String filename = '\u200E' + (image.spoiler() ? (image.hidden
                         ? getString(R.string.image_hidden_filename)
                         : getString(R.string.image_spoiler_filename)) : image.filename + "." + image.extension);
-                SpannableStringBuilder fileInfo =
-                        new SpannableStringBuilder().append("\n").append(applySearchSpans(filename, searchQuery));
+                SpannableStringBuilder fileInfo = new SpannableStringBuilder().append("\n")
+                        .append(applySearchSpans(theme, filename, callback.getSearchQuery()));
                 fileInfo.setSpan(new ForegroundColorSpanHashed(detailsColor), 0, fileInfo.length(), 0);
                 fileInfo.setSpan(new AbsoluteSizeSpanHashed(detailsSizePx), 0, fileInfo.length(), 0);
                 fileInfo.setSpan(new UnderlineSpan(), 0, fileInfo.length(), 0);
@@ -376,21 +370,7 @@ public class PostCell
 
         title.setText(titleParts);
 
-        icons.edit();
-        icons.set(PostIcons.STICKY, post.isSticky());
-        icons.set(PostIcons.CLOSED, post.isClosed());
-        icons.set(PostIcons.DELETED, post.deleted.get());
-        icons.set(PostIcons.ARCHIVED, post.isArchived());
-        icons.set(PostIcons.HTTP_ICONS, post.httpIcons != null);
-
-        if (post.httpIcons != null) {
-            icons.setHttpIcons(post.httpIcons, iconSizePx);
-            comment.setPadding(paddingPx, paddingPx, paddingPx, paddingPx);
-        } else {
-            comment.setPadding(paddingPx, paddingPx / 2, paddingPx, paddingPx);
-        }
-
-        icons.apply();
+        icons.setWithText(post, iconSizePx);
 
         if (!threadMode) {
             comment.setMaxLines(COMMENT_MAX_LINES_BOARD);
@@ -414,7 +394,7 @@ public class PostCell
             comment.setVisibility(isEmpty(post.comment) && post.images.isEmpty() ? GONE : VISIBLE);
         }
 
-        comment.setText(applySearchSpans(post.comment, searchQuery));
+        comment.setText(applySearchSpans(theme, post.comment, callback.getSearchQuery()));
 
         if (threadMode) {
             comment.setTextIsSelectable(true);
@@ -475,7 +455,7 @@ public class PostCell
             comment.setOnTouchListener((v, event) -> doubleTapComment.onTouchEvent(event));
 
             if (loadable.site.siteFeature(Site.SiteFeature.POSTING)) {
-                title.setOnLongClickListener(v -> {
+                headerWrapper.setOnLongClickListener(v -> {
                     callback.onPostNoClicked(post);
                     return true;
                 });
@@ -487,24 +467,29 @@ public class PostCell
             // Sets focusable to auto, clickable and longclickable to false.
             comment.setMovementMethod(null);
 
-            title.setBackgroundResource(0);
-            title.setLongClickable(false);
+            headerWrapper.setBackgroundResource(0);
+            headerWrapper.setLongClickable(false);
         }
 
         if ((!threadMode && post.getReplies() > 0) || (post.repliesFrom.size() > 0)) {
             replies.setVisibility(VISIBLE);
 
             int replyCount = threadMode ? post.repliesFrom.size() : post.getReplies();
-            String text = getQuantityString(R.plurals.reply, replyCount, replyCount);
+            SpannableStringBuilder text = new SpannableStringBuilder();
+            text.append(getQuantityString(R.plurals.reply, replyCount, replyCount));
+            if (replyCount > 7 && loadable.isThreadMode()) {
+                text.setSpan(new StyleSpan(Typeface.BOLD), 0, text.length(), 0);
+            }
 
             if (!threadMode && post.getImagesCount() > 0) {
-                text += ", " + getQuantityString(R.plurals.image, post.getImagesCount(), post.getImagesCount());
+                text.append(", ")
+                        .append(getQuantityString(R.plurals.image, post.getImagesCount(), post.getImagesCount()));
             }
 
             if (!ChanSettings.neverShowPages.get() && loadable.isCatalogMode()) {
                 ChanPage p = PageRepository.getPage(post);
                 if (p != null && isNotBumpOrder(ChanSettings.boardOrder.get())) {
-                    text += ", page " + p.page;
+                    text.append(", page ").append(String.valueOf(p.page));
                 }
             }
 
@@ -512,78 +497,49 @@ public class PostCell
         } else {
             replies.setVisibility(GONE);
         }
-
-        // in order for proper measurement to occur for shift-post formatting, this cell needs to be not-shifted first
-        clearShiftPostFormatting();
-        waitForLayout(this, view -> {
-            // we now know the measurements of all the views, so we can shift-format stuff without issue
-            return doShiftPostFormatting();
-        });
-
-        findViewById(R.id.embed_spinner).setVisibility(GONE);
-        embedCalls.addAll(EmbeddingEngine.getInstance().embed(theme, post, this));
-        if (!embedCalls.isEmpty()) {
-            findViewById(R.id.embed_spinner).setVisibility(VISIBLE);
-        }
     }
 
-    private void clearShiftPostFormatting() {
-        if (!ChanSettings.shiftPostFormat.get()) return;
-        RelativeLayout.LayoutParams commentParams = new RelativeLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        commentParams.alignWithParent = true;
-        commentParams.addRule(BELOW, R.id.icons);
-        commentParams.addRule(ALIGN_PARENT_RIGHT);
-        commentParams.addRule(RIGHT_OF, R.id.thumbnail_views);
-        comment.setLayoutParams(commentParams);
-        comment.setPadding(paddingPx, paddingPx, paddingPx, paddingPx);
+    // matches cell_post's declarations, and adjustments from those declarations
+    private static final RelativeLayout.LayoutParams DEFAULT_BODY_PARAMS =
+            new RelativeLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
+    private static final RelativeLayout.LayoutParams SHIFT_LEFT_PARAMS;
+    private static final RelativeLayout.LayoutParams SHIFT_BELOW_PARAMS;
 
-        RelativeLayout.LayoutParams replyParams = new RelativeLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        replyParams.alignWithParent = true;
-        replyParams.addRule(ALIGN_PARENT_BOTTOM);
-        replyParams.addRule(BELOW, R.id.comment);
-        replyParams.addRule(RIGHT_OF, R.id.thumbnail_views);
-        replies.setLayoutParams(replyParams);
-        replies.setPadding(paddingPx, 0, paddingPx, paddingPx);
-        replies.setGravity(Gravity.BOTTOM);
+    static {
+        DEFAULT_BODY_PARAMS.alignWithParent = true;
+        DEFAULT_BODY_PARAMS.addRule(BELOW, R.id.header_wrapper);
+        DEFAULT_BODY_PARAMS.addRule(RIGHT_OF, R.id.thumbnail_views);
+
+        SHIFT_LEFT_PARAMS = new RelativeLayout.LayoutParams(DEFAULT_BODY_PARAMS);
+        SHIFT_LEFT_PARAMS.removeRule(RIGHT_OF);
+
+        SHIFT_BELOW_PARAMS = new RelativeLayout.LayoutParams(SHIFT_LEFT_PARAMS);
+        SHIFT_BELOW_PARAMS.addRule(BELOW, R.id.thumbnail_views);
     }
 
-    private boolean doShiftPostFormatting() {
-        if (!ChanSettings.shiftPostFormat.get() || comment.getVisibility() != VISIBLE || post.images.size() != 1
-                || ChanSettings.textOnly.get()) return true;
-        float wrapHeightCheck = 0.8f * thumbnailViews.getHeight();
-        int wrapHeightActual = title.getHeight() + icons.getHeight();
-        if ((wrapHeightActual >= wrapHeightCheck) || wrapHeightActual + comment.getHeight() >= 2f * wrapHeightCheck) {
-            RelativeLayout.LayoutParams commentParams = (RelativeLayout.LayoutParams) comment.getLayoutParams();
-            commentParams.removeRule(RelativeLayout.RIGHT_OF);
-            if (title.getHeight() + (icons.getVisibility() == VISIBLE ? icons.getHeight() : 0)
-                    < thumbnailViews.getHeight()) {
-                commentParams.addRule(RelativeLayout.BELOW, R.id.thumbnail_views);
-            } else {
-                commentParams.addRule(RelativeLayout.BELOW,
-                        (icons.getVisibility() == VISIBLE ? R.id.icons : R.id.title)
-                );
+    public void doShiftPostFormatting() {
+        if (isInEditMode() || comment.getVisibility() != VISIBLE) return;
+        int thumbnailViewsHeight = thumbnailViews.getVisibility() == VISIBLE ? thumbnailViews.getHeight() : 0;
+        int headerHeight = headerWrapper.getHeight();
+        int wrapHeight = headerHeight + comment.getHeight();
+        boolean shiftLeftThumb = headerHeight > thumbnailViewsHeight;
+        boolean shiftBelowThumb = wrapHeight > 2 * thumbnailViewsHeight;
+        boolean shift = post != null && (post.images.size() == 1 || (post.images.size() > 1
+                && headerHeight > thumbnailViewsHeight / 2));
+        if (shift) {
+            if (!shiftLeftThumb && shiftBelowThumb) {
+                bodyWrapper.setLayoutParams(SHIFT_BELOW_PARAMS);
+            } else if (shiftLeftThumb) {
+                bodyWrapper.setLayoutParams(SHIFT_LEFT_PARAMS);
             }
-            comment.setLayoutParams(commentParams);
-
-            RelativeLayout.LayoutParams replyParams = (RelativeLayout.LayoutParams) replies.getLayoutParams();
-            replyParams.removeRule(RelativeLayout.RIGHT_OF);
-            replies.setLayoutParams(replyParams);
-            return false;
+            requestLayout();
         }
-        return true;
-    }
-
-    @Override
-    public void invalidateView(Theme theme, Post post) {
-        if (!bound || !this.post.equals(post)) return;
-        embedCalls.clear();
-        bindPost(theme, post);
     }
 
     private final String[] dubTexts =
             {"", "(Dubs)", "(Trips)", "(Quads)", "(Quints)", "(Sexes)", "(Septs)", "(Octs)", "(Nons)", "(Decs)"};
 
-    private String getRepeatDigits(int no) {
+    private SpannableString getRepeatDigits(int no) {
         CharSequence number = new StringBuilder().append(no).reverse();
         char init = number.charAt(0);
         int count = 1;
@@ -595,35 +551,22 @@ public class PostCell
                 break;
             }
         }
-        return dubTexts[count - 1];
+        SpannableString s = new SpannableString(dubTexts[count - 1]);
+        s.setSpan(new StyleSpan(Typeface.BOLD), 0, s.length(), 0);
+        return s;
     }
 
-    private void unbindPost(Post post) {
-        bound = false;
-        icons.cancelRequests();
-        title.setOnLongClickListener(null);
-        title.setLongClickable(false);
+    @Override
+    public void unsetPost() {
+        thumbnailViews.setAdapter(null);
+        icons.clear();
+        headerWrapper.setOnLongClickListener(null);
+        headerWrapper.setLongClickable(false);
         comment.setOnTouchListener(null);
         comment.setMovementMethod(null);
-        setPostLinkableListener(post, false);
-        for (Call c : embedCalls) {
-            c.cancel();
-        }
-        embedCalls.clear();
-        findViewById(R.id.embed_spinner).setVisibility(GONE);
-    }
-
-    private void setPostLinkableListener(Post post, boolean bind) {
-        if (post.comment != null) {
-            PostLinkable[] linkables = post.comment.getSpans(0, post.comment.length(), PostLinkable.class);
-            for (PostLinkable linkable : linkables) {
-                linkable.setMarkedNo(bind ? markedNo : -1);
-            }
-
-            if (!bind) {
-                post.comment.removeSpan(BACKGROUND_SPAN);
-            }
-        }
+        post.comment.removeSpan(BACKGROUND_SPAN);
+        bodyWrapper.setLayoutParams(DEFAULT_BODY_PARAMS);
+        post = null;
     }
 
     private static final BackgroundColorSpan BACKGROUND_SPAN = new BackgroundColorSpan(0x6633B5E5);
@@ -725,29 +668,51 @@ public class PostCell
     }
 
     private class PostImagesAdapter
-            extends RecyclerView.Adapter<PostImagesAdapter.PostImageViewHolder> {
+            extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         public PostImagesAdapter() {
             setHasStableIds(true);
         }
 
         @NonNull
         @Override
-        public PostImageViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            PostImageThumbnailView thumbnailView = new PostImageThumbnailView(parent.getContext());
-            thumbnailView.setLayoutParams(new ViewGroup.MarginLayoutParams(getThumbnailSize(), getThumbnailSize()));
+        public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+            Context c = parent.getContext();
+            PostImageThumbnailView thumbnailView = new PostImageThumbnailView(c);
+            thumbnailView.setLayoutParams(new ViewGroup.MarginLayoutParams(getThumbnailSize(c), getThumbnailSize(c)));
             thumbnailView.setRounding(dp(2));
-            thumbnailView.setDecodeSize(getThumbnailSize());
-            return new PostImageViewHolder(thumbnailView);
+            return new RecyclerView.ViewHolder(thumbnailView) {};
         }
 
         @Override
-        public void onBindViewHolder(@NonNull PostImageViewHolder holder, int position) {
+        public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
             PostImageThumbnailView thumbnailView = (PostImageThumbnailView) holder.itemView;
-            PostImage image = post.images.get(position);
-            thumbnailView.setPostImage(image);
-            if (!post.deleted.get() || instance(CacheHandler.class).exists(image.imageUrl)) {
-                thumbnailView.setOnClickListener(v -> callback.onThumbnailClicked(image, thumbnailView));
+            final PostImage image = post.images.get(position);
+            thumbnailView.setPostImage(image, getThumbnailSize(holder.itemView.getContext()));
+
+            final Post internalPost = post;
+            thumbnailView.setOnClickListener(v -> {
+                if (!internalPost.deleted.get() || image.isInlined || NetUtils.isCached(image.imageUrl)) {
+                    callback.onThumbnailClicked(image, thumbnailView);
+                }
+            });
+
+            if (ChanSettings.enableLongPressURLCopy.get()) {
+                thumbnailView.setOnLongClickListener(v -> {
+                    setClipboardContent("Image URL", image.imageUrl.toString());
+                    showToast(getContext(), R.string.image_url_copied_to_clipboard);
+                    return true;
+                });
             }
+        }
+
+        @Override
+        public void onViewRecycled(
+                @NonNull RecyclerView.ViewHolder holder
+        ) {
+            PostImageThumbnailView thumbnailView = (PostImageThumbnailView) holder.itemView;
+            thumbnailView.setPostImage(null, 0);
+            thumbnailView.setOnClickListener(null);
+            thumbnailView.setOnLongClickListener(null);
         }
 
         @Override
@@ -757,14 +722,7 @@ public class PostCell
 
         @Override
         public long getItemId(int position) {
-            return post.images.get(position).imageUrl.hashCode();
-        }
-
-        private class PostImageViewHolder
-                extends RecyclerView.ViewHolder {
-            public PostImageViewHolder(@NonNull View itemView) {
-                super(itemView);
-            }
+            return post.images.get(position).hashCode();
         }
     }
 
@@ -772,8 +730,8 @@ public class PostCell
             extends RecyclerView.ItemDecoration {
         private final int spacing;
 
-        public DPSpacingItemDecoration(int spacing) {
-            this.spacing = dp(spacing);
+        public DPSpacingItemDecoration(Context context, int spacing) {
+            this.spacing = dp(context, spacing);
         }
 
         @Override
@@ -785,189 +743,6 @@ public class PostCell
         ) {
             super.getItemOffsets(outRect, view, parent, state);
             outRect.bottom = spacing;
-        }
-    }
-
-    public static class PostIcons
-            extends View {
-        private static final int STICKY = 0x1;
-        private static final int CLOSED = 0x2;
-        private static final int DELETED = 0x4;
-        private static final int ARCHIVED = 0x8;
-        private static final int HTTP_ICONS = 0x10;
-
-        private int height;
-        private int spacing;
-        private int icons;
-        private int previousIcons;
-        private final RectF drawRect = new RectF();
-
-        private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final Rect textRect = new Rect();
-
-        private int httpIconTextColor;
-        private int httpIconTextSize;
-
-        private List<PostIconsHttpIcon> httpIcons;
-
-        public PostIcons(Context context) {
-            this(context, null);
-        }
-
-        public PostIcons(Context context, AttributeSet attrs) {
-            this(context, attrs, 0);
-        }
-
-        public PostIcons(Context context, AttributeSet attrs, int defStyleAttr) {
-            super(context, attrs, defStyleAttr);
-
-            textPaint.setTypeface(Typeface.create((String) null, Typeface.ITALIC));
-            setVisibility(GONE);
-        }
-
-        public void setHeight(int height) {
-            this.height = height;
-        }
-
-        public void setSpacing(int spacing) {
-            this.spacing = spacing;
-        }
-
-        public void edit() {
-            previousIcons = icons;
-            httpIcons = null;
-        }
-
-        public void apply() {
-            if (previousIcons != icons) {
-                // Require a layout only if the height changed
-                if (previousIcons == 0 || icons == 0) {
-                    setVisibility(icons == 0 ? GONE : VISIBLE);
-                    requestLayout();
-                }
-
-                invalidate();
-            }
-        }
-
-        public void setHttpIcons(List<PostHttpIcon> icons, int size) {
-            httpIconTextColor = getAttrColor(getContext(), R.attr.post_details_color);
-            httpIconTextSize = size;
-            httpIcons = new ArrayList<>(icons.size());
-            for (PostHttpIcon icon : icons) {
-                int codeIndex = icon.name.indexOf('/'); //this is for country codes
-                String name = icon.name.substring(0, codeIndex != -1 ? codeIndex : icon.name.length());
-                PostIconsHttpIcon j = new PostIconsHttpIcon(this, name, icon.url);
-                httpIcons.add(j);
-            }
-        }
-
-        public void cancelRequests() {
-            if (httpIcons != null) {
-                for (PostIconsHttpIcon httpIcon : httpIcons) {
-                    httpIcon.cancel();
-                }
-            }
-        }
-
-        public void set(int icon, boolean enable) {
-            if (enable) {
-                icons |= icon;
-            } else {
-                icons &= ~icon;
-            }
-        }
-
-        public boolean get(int icon) {
-            return (icons & icon) == icon;
-        }
-
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            int measureHeight = icons == 0 ? 0 : (height + getPaddingTop() + getPaddingBottom());
-
-            setMeasuredDimension(widthMeasureSpec, MeasureSpec.makeMeasureSpec(measureHeight, EXACTLY));
-        }
-
-        @Override
-        protected void onDraw(Canvas canvas) {
-            if (icons != 0) {
-                canvas.save();
-                canvas.translate(getPaddingLeft(), getPaddingTop());
-
-                int offset = 0;
-
-                if (get(STICKY)) {
-                    offset += drawBitmap(canvas, BitmapRepository.stickyIcon, offset);
-                }
-
-                if (get(CLOSED)) {
-                    offset += drawBitmap(canvas, BitmapRepository.closedIcon, offset);
-                }
-
-                if (get(DELETED)) {
-                    offset += drawBitmap(canvas, BitmapRepository.trashIcon, offset);
-                }
-
-                if (get(ARCHIVED)) {
-                    offset += drawBitmap(canvas, BitmapRepository.archivedIcon, offset);
-                }
-
-                if (get(HTTP_ICONS)) {
-                    for (PostIconsHttpIcon httpIcon : httpIcons) {
-                        if (httpIcon.bitmap != null) {
-                            offset += drawBitmap(canvas, httpIcon.bitmap, offset);
-
-                            textPaint.setColor(httpIconTextColor);
-                            textPaint.setTextSize(httpIconTextSize);
-                            textPaint.getTextBounds(httpIcon.name, 0, httpIcon.name.length(), textRect);
-                            float y = height / 2f - textRect.exactCenterY();
-                            canvas.drawText(httpIcon.name, offset, y, textPaint);
-                            offset += textRect.width() + spacing;
-                        }
-                    }
-                }
-
-                canvas.restore();
-            }
-        }
-
-        private int drawBitmap(Canvas canvas, Bitmap bitmap, int offset) {
-            int width = (int) (((float) height / bitmap.getHeight()) * bitmap.getWidth());
-            drawRect.set(offset, 0f, offset + width, height);
-            canvas.drawBitmap(bitmap, null, drawRect, null);
-            return width + spacing;
-        }
-    }
-
-    private static class PostIconsHttpIcon {
-        private final String name;
-        private Call request;
-        private Bitmap bitmap;
-
-        private PostIconsHttpIcon(final PostIcons postIcons, String name, HttpUrl url) {
-            this.name = name;
-
-            request = NetUtils.makeBitmapRequest(url, new NetUtilsClasses.BitmapResult() {
-                @Override
-                public void onBitmapFailure(@NonNull HttpUrl source, Exception e) {
-                    bitmap = BitmapRepository.error;
-                    postIcons.invalidate();
-                }
-
-                @Override
-                public void onBitmapSuccess(@NonNull HttpUrl source, @NonNull Bitmap bitmap) {
-                    PostIconsHttpIcon.this.bitmap = bitmap;
-                    postIcons.invalidate();
-                }
-            });
-        }
-
-        private void cancel() {
-            if (request != null) {
-                request.cancel();
-                request = null;
-            }
         }
     }
 

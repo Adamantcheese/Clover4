@@ -20,16 +20,14 @@ import com.github.adamantcheese.chan.core.settings.primitives.Setting;
 
 import java.util.List;
 
-import static com.github.adamantcheese.chan.core.site.SiteSetting.Type.OPTIONS;
-import static com.github.adamantcheese.chan.core.site.SiteSetting.Type.STRING;
-
 /**
  * Hacky stuff to give the site settings a good UI.
  */
 public class SiteSetting<T> {
     public enum Type {
         OPTIONS,
-        STRING
+        STRING,
+        BOOLEAN
     }
 
     public final String name;
@@ -37,9 +35,9 @@ public class SiteSetting<T> {
     public final Setting<T> setting;
     public List<String> optionNames;
 
-    public SiteSetting(String name, Setting<T> setting, List<String> optionNames) {
+    public SiteSetting(String name, Type type, Setting<T> setting, List<String> optionNames) {
         this.name = name;
-        this.type = optionNames == null ? STRING : OPTIONS;
+        this.type = type;
         this.setting = setting;
         this.optionNames = optionNames;
     }

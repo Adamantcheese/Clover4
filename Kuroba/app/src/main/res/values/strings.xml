@@ -88,6 +88,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="select_none">Select none</string>
     <string name="loading">Loading…</string>
     <string name="default_">Default</string>
+    <string name="open">Open</string>
 
     <string name="mark_as_my_post">Mark as my post</string>
     <string name="unmark_as_my_post">Unmark as my post</string>
@@ -102,14 +103,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="update_install_downloading">Downloading…</string>
     <string name="update_install_download_failed">Could not download the new version.</string>
     <string name="update_install_download_failed_description">Because %1$s.</string>
-    <string name="update_retry_title">Retry</string>
-    <string name="update_retry">%1$s not upgraded yet. Tap \"Retry\" to try installing the new version again.</string>
-    <string name="update_retry_button">Retry</string>
-    <string name="update_storage_permission_required_title">Storage permission required</string>
-    <string name="update_storage_permission_required">
-"Grant storage access permission to install the new version.
-
-Re-enable this permission in the app settings if you permanently disabled it."</string>
 
     <string name="minutes">%d minutes</string>
     <string name="card_stats">%1$dR %2$dI</string>
@@ -235,7 +228,6 @@ If the pattern matches, then the post can be hidden, removed, highlighted, or au
     3. Regular expressions. <tt>/^>implying/</tt> for example. You can use <tt>/^>ImPlYiNg/<b>i</b></tt> to make the regex case insensitive.
     You can use Regex101 for more comprehensive explanations of your regular expressions, or as a playground for figuring out an expression. Use Javascript to test.<br>
 </p>
-For country code filtering, troll country codes should be prepended with <tt>t_</tt>. A country code filter automatically implies the case insensitive flag for regex.<br>
 <br>
 Actions do the following:<br>
 <b>Hide:</b> Replace the post with a stub. You can tap it to un-hide it.<br>
@@ -254,7 +246,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     6) Comment<br>
     7) ID<br>
     8) Subject<br>
-    9) Country code<br>
+    9) Flag code<br>
     10) Filename<br>
 </p>
 ]]>
@@ -265,7 +257,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="filter_id">ID</string>
     <string name="filter_subject">Subject</string>
     <string name="filter_filename">Filename</string>
-    <string name="filter_country_code">Country code</string>
+    <string name="filter_flag_code">Flag code</string>
     <string name="filter_image_hash">Image hash</string>
 
     <string name="drawer_history">Historical threads</string>
@@ -284,7 +276,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="post_quote">Quote</string>
     <string name="post_quote_text">Quote text</string>
     <string name="post_info">Post info</string>
-    <string name="post_show_links">Show links</string>
+    <string name="post_links">Post links</string>
     <string name="post_share">Share</string>
 
     <string name="post_copy_menu">Copy…</string>
@@ -293,7 +285,6 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="post_copy_cross_board_link">Cross-board link</string>
     <string name="post_copy_image_url">Image URL</string>
     <string name="post_copy_post_url">Post URL</string>
-    <string name="post_copy_links">Links in post</string>
 
     <string name="post_link_copied">Link copied to clipboard</string>
     <string name="post_cross_board_link_copied">Cross-board link copied to clipboard</string>
@@ -476,6 +467,7 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
 
     <!-- Behavior proxy group -->
     <string name="setting_proxy_port">Proxy server port</string>
+    <string name="setting_proxy_type">Proxy type</string>
 
     <!-- Media -->
     <string name="settings_screen_media">Media</string>
@@ -493,13 +485,9 @@ Enabled filters have priority from top to bottom in your list. Filter precedence
     <string name="setting_save_server_filename">Saved filenames from server</string>
     <string name="setting_save_server_filename_description">Use site-assigned filenames. Otherwise use name chosen by uploader.</string>
     <string name="setting_video_default_muted">Start videos muted</string>
-    <string name="setting_video_stream">Stream videos</string>
-    <string name="setting_video_stream_description">Attempt to stream videos, instead of downloading them completely. (Works really badly on 4chan servers.)</string>
-    <string name="setting_video_default_muted_description">Starts videos without sound.</string>
+    <string name="setting_video_default_muted_description">Starts videos without sound</string>
     <string name="setting_headset_default_muted">Mute headset videos</string>
-    <string name="setting_headset_default_muted_description">Mute the video even if a wired headset is connected.</string>
-    <string name="setting_video_open_external">External player for videos</string>
-    <string name="setting_video_open_external_description">Plays videos using an external media player app.</string>
+    <string name="setting_headset_default_muted_description">Mute the video even if a <i>wired<i> headset is connected</string>
     <string name="setting_share_url">Share URL to image</string>
     <string name="setting_share_url_description">Share the URL to the image instead of the image itself.</string>
     <string name="settings_remove_image_spoilers">Remove image spoilers</string>
@@ -536,6 +524,8 @@ Re-enable this permission in the app settings if you permanently disabled it."
 Tap the toolbar menu to change color.
 Tap ✓ once done.
 
+The accent colour controls the colours for pressed scrollbar, mod capcode, last seen indicator, and FAB.
+              
 On Android 10+, clicking the sun/moon selects colours for the day or night theme if dark mode is on.
 Setting the themes to the same means nothing happens in dark mode. The app will restart to use changes."
     </string>
@@ -554,6 +544,8 @@ Setting the themes to the same means nothing happens in dark mode. The app will 
     <string name="setting_pass_authenticated">Device authorized</string>
     <string name="setting_pass_logout">Log out</string>
     <string name="setting_pass_error">Connection error</string>
+    <string name="setting_pass_error_login">Could not log in</string>
+    <string name="setting_pass_error_logout">Could not log out</string>
     <string name="setting_pass_bottom_description">"
 <![CDATA[
 Forgot your 4chan Pass login details?<br>
@@ -575,7 +567,7 @@ Don't have a 4chan Pass?<br>
     <string name="reencode_image_re_encode_image_text">Re-encode %s image as</string>
     <string name="reencode_image_as_jpeg">JPEG</string>
     <string name="reencode_image_as_png">PNG</string>
-    <string name="tap_image_for_extra_options">Tap image for extra options</string>
+    <string name="reencode_button_hint">Tap to resize/reencode image</string>
 
     <string name="settings_import_export">Import/Export</string>
     <string name="settings_import_export_description">Import/export settings/PINs, etc.</string>
@@ -630,6 +622,8 @@ Don't have a 4chan Pass?<br>
 
     <string name="settings_experimental_settings_title">⚠ EXPERIMENTAL ⚠</string>
     <string name="settings_experimental_settings_description">These test settings may be unstable and break the app, and sometimes require resetting all app data. Back up everything beforehand and use at your own risk.</string>
+    <string name="setting_enable_emoji">Emoji</string>
+    <string name="setting_enable_emoji_description">Allows seeing and pasting advanced smileys.</string>
     <string name="setting_full_screen_rotation">Allow full sensor rotation</string>
     <string name="settings_always_open_drawer">Always open the drawer when a thread is bookmarked</string>
     <string name="settings_image_long_url">Copy image URLs with long-press</string>
@@ -685,6 +679,7 @@ Don't have a 4chan Pass?<br>
     <string name="setting_image_viewer_gestures_description">Allows using gestures to close (swipe-↑) and save (swipe-↓) an image, GIF, or WebM in gallery view.</string>
 
     <string name="lorem_ipsum">Fearful ubermensch war insofar love horror. Grandeur convictions prejudice snare pinnacle against revaluation spirit. Love love decrepit.</string>
+    <string name="lorem_ipsum_short">Fearful ubermensch war insofar love horror. Grandeur convictions.</string>
     <string name="report_controller_report_an_error_problem">Report errors, crashes, and other problems.</string>
     <string name="report_controller_i_have_a_problem_with">I have a problem with:</string>
     <string name="report_controller_problem_description">Problem description:</string>
@@ -696,16 +691,6 @@ Don't have a 4chan Pass?<br>
     <string name="report_controller_logs_are_empty_error">You selected \"Attach logs\", but didn\'t…</string>
     <string name="report_controller_report_sent">Report sent.</string>
     <string name="report_controller_error_while_trying_to_send_report">Could not send report: %1$s</string>
-
-    <string name="hsid_cookie_text">HSID</string>
-    <string name="ssid_cookie_text">SSID</string>
-    <string name="sid_cookie_text">SID</string>
-    <string name="nid_cookie_text">NID</string>
-    <string name="js_captcha_cookies_editor_format_hint">Do not prepend values with \"HSID=…\", \"SSID=…\" etc.</string>
-    <string name="settings_js_captcha_cookies_title">JavaScript CAPTCHA cookies</string>
-    <string name="settings_js_captcha_cookies_description">By inputting CAPTCHA cookies from your desktop web browser, solving CAPTCHAs may become easier.</string>
-    <string name="cookies_editor_bad_cookie">%1$s cookie not set!</string>
-    <string name="cookies_editor_failed_parse">Could not parse cookies, re-enter them correctly.</string>
 
     <string name="settings_report">Report</string>
     <string name="settings_report_description">Report a problem or crash.</string>
@@ -721,40 +706,26 @@ Don't have a 4chan Pass?<br>
     <string name="sent_n_crashlogs">Sent %1$d crash log(s)</string>
 
     <string name="media_settings_base_dir_reset">Base folder reset to default</string>
-    <string name="media_settings_could_not_create_default_baseDir">Could not create a default base folder because %1$s</string>
+    <string name="media_settings_could_not_create_default_baseDir">Could not create default base folder because %1$s</string>
 
-    <string name="site_uses_dynamic_boards">"Since the site likely has dynamic boards you must add one from the \"Boards\" menu first."</string>
-    <string name="could_not_start_saving_no_permissions">Grant write access permission to start downloading images</string>
-    <string name="update_manager_copy_apk_title">Copy APK?</string>
-    <string name="update_manager_copy_apk">Would you like to store this APK?</string>
-    <string name="update_manager_could_not_convert_uri">Could not convert URI (%1$s) into an ExternalFile</string>
-    <string name="update_manager_input_file_does_not_exist">Input APK file (%1$s) does not exist</string>
-    <string name="update_manager_output_file_does_not_exist">The output file (%1$s) does not exist</string>
-    <string name="update_manager_could_not_copy_apk">Could not copy file content from the file (%1$s) into (%2$s)</string>
-    <string name="update_manager_apk_copied">APK copied</string>
-    <string name="settings_show_copy_apk_dialog_title">Show \"copy APK\" dialog when downloading a new version</string>
-    <string name="settings_show_copy_apk_dialog">Every time you download a new version, a suggestion to copy that APK to some other folder will be shown.</string>
+    <string name="site_uses_dynamic_boards">Since the site likely has dynamic boards you must add one from the \"Boards\" menu first.</string>
+    <string name="could_not_start_saving_no_permissions">Grant write access to download images first.</string>
 
-    <string name="could_not_initialized_captcha">Could not present CAPTCHA because %1$s</string>
+    <string name="could_not_initialized_captcha">Coul not present CAPTCHA because %1$s</string>
     <string name="fail_reason_webview_is_not_installed">WebView is not installed</string>
     <string name="fail_reason_some_part_of_webview_not_initialized">Could not start WebViewChromium because %1$s</string>
 
     <string name="setting_enable_image_link_loading">Image link loading</string>
-    <string name="setting_enable_image_link_loading_description">Adds any JPG, PNG, GIF, WebM, MP4, PDF, BMP, WebP, MP3, SWF, M4A, OGG, or FLAC files linked in posts as internally viewable post attachments with a special spoiler image.</string>
+    <string name="setting_enable_image_link_loading_description">Adds any JPG, PNG, GIF, WEBM, MP4, PDF, BMP, WEBP, MP3, SWF, M4A, OGG, FLAC, or WAV files linked in posts as internally viewable post attachments with a special spoiler image.</string>
     <string name="add_new_zone">Add new zone</string>
-    <string name="setting_exclusion_zones_left_zone_portrait">← zone (▯)</string>
-    <string name="setting_exclusion_zones_right_zone_portrait">→ zone (▯)</string>
-    <string name="setting_exclusion_zones_left_zone_landscape">← zone (▭)</string>
-    <string name="setting_exclusion_zones_right_zone_landscape">→ zone (▭)</string>
+    <string name="setting_exclusion_zones_left_zone">← zone</string>
+    <string name="setting_exclusion_zones_right_zone">→ zone</string>
     <string name="setting_exclusion_zones_reset_zones">Reset exclusion zones</string>
-    <string name="setting_exclusion_zones_reset_zones_description">All exclusion zones will be deleted and the app restarted.</string>
-    <string name="setting_exclusion_zones_editor">Android 10 gesture-exclusion zones</string>
-    <string name="setting_exclusion_zones_editor_description">Adjust zones where Android 10 gestures are turned off.\nRotate your device to set zones for different orientations.\nRestart the app to use changes.</string>
-    <string name="setting_exclusion_zones_actions_dialog_title">Android 10 exclusion zones actions</string>
-    <string name="setting_exclusion_zones_wrong_phone_orientation">Wrong device orientation. Rotate your device 90° to any side before using this option.</string>
+    <string name="setting_exclusion_zones_editor">Gesture exclusion zones</string>
+    <string name="setting_exclusion_zones_editor_description">Adjust zones where Android 10+ gestures will be disabled.\nYou will have to rotate your device to set zones for different orientations.</string>
+    <string name="setting_exclusion_zones_actions_dialog_title_portrait">Exclusion zone actions (portrait)</string>
+    <string name="setting_exclusion_zones_actions_dialog_title_landscape">Exclusion zone actions (landscape)</string>
     <string name="setting_exclusion_zones_edit_or_remove_zone_title">Edit or remove zone?</string>
-    <string name="setting_exclusion_zones_zone_removed">Zone removed. Restart the app for the changes to kick in.</string>
-    <string name="setting_exclusion_zones_zone_added">New exclusion zone added. Restart the app to use changes.</string>
 
     <string name="setting_allow_okhttp_http2">Allow OkHttp to use HTTP/2 protocol</string>
     <string name="setting_allow_okhttp_ipv6">Allow OkHttp to use IPv6</string>
@@ -762,7 +733,7 @@ Don't have a 4chan Pass?<br>
 
     <string name="file_has_orientation_exif_data">This file has orientation data. Consider re-encoding it before posting.</string>
     <string name="file_type_may_not_be_supported">This file may not be supported on this imageboard. Consider re-encoding it before posting.</string>
-    <string name="file_cannot_be_reencoded">Image doesn\'t support re-encoding.</string>
+    <string name="file_cannot_be_reencoded">The image doesn\'t support re-encoding.</string>
 
     <string name="view_my_posts">View my posts</string>
     <string name="no_saved_posts_for_current_thread">None of the posts in this thread are yours.</string>
@@ -775,16 +746,17 @@ Don't have a 4chan Pass?<br>
 
     <string name="apply_image_filter_to_post">Image hash filtering of posts</string>
     <string name="apply_image_filter_to_post_description">Image hash filtering for posts, as opposed to images.</string>
-    <string name="yt_api_key_dialog">YouTube API Key</string>
-    <string name="yt_api_key_dialog_description">Without a key, parsing is still possible, but may not be reliable. You can use your own key, or get the one from 4chan X.</string>
 
     <string name="clear_history">Long-press to clear all history.</string>
     <string name="no_history">No history available.</string>
 
     <string name="filter_add_hint">Add a filter</string>
     <string name="filter_toggle_hint">Toggle all filters on/off</string>
+    <string name="filter_debug_hint">Toggle filter debugging</string>
     <string name="album_download_hint">Download multiple images</string>
 
     <string name="reply_filename_hint">Tap to randomize filename</string>
     <string name="reply_spoiler_hint">Toggle if posting as a spoiler</string>
+
+    <string name="board_info">Board info</string>
 </resources>

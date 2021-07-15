@@ -24,7 +24,6 @@ import android.nfc.NdefMessage;
 import android.nfc.NfcAdapter;
 import android.nfc.NfcEvent;
 import android.os.Bundle;
-import android.util.LruCache;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.ViewGroup;
@@ -39,18 +38,18 @@ import com.github.adamantcheese.chan.controller.Controller;
 import com.github.adamantcheese.chan.controller.NavigationController;
 import com.github.adamantcheese.chan.core.database.DatabaseLoadableManager;
 import com.github.adamantcheese.chan.core.database.DatabaseUtils;
+import com.github.adamantcheese.chan.core.manager.FilterWatchManager;
 import com.github.adamantcheese.chan.core.manager.UpdateManager;
 import com.github.adamantcheese.chan.core.manager.WatchManager;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.model.orm.Pin;
+import com.github.adamantcheese.chan.core.net.NetUtils;
 import com.github.adamantcheese.chan.core.repository.SiteRepository;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
-import com.github.adamantcheese.chan.core.settings.PersistableChanState;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.SiteResolver;
 import com.github.adamantcheese.chan.features.embedding.EmbeddingEngine;
-import com.github.adamantcheese.chan.features.embedding.EmbeddingEngine.EmbedResult;
 import com.github.adamantcheese.chan.ui.controller.BrowseController;
 import com.github.adamantcheese.chan.ui.controller.DoubleNavigationController;
 import com.github.adamantcheese.chan.ui.controller.DrawerController;
@@ -65,17 +64,14 @@ import com.github.adamantcheese.chan.ui.theme.ThemeHelper;
 import com.github.adamantcheese.chan.utils.Logger;
 import com.github.k1rakishou.fsaf.FileChooser;
 import com.github.k1rakishou.fsaf.callback.FSAFActivityCallbacks;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
 import org.greenrobot.eventbus.ThreadMode;
 import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.Type;
+import java.io.File;
 import java.util.List;
-import java.util.Map;
 import java.util.Stack;
 
 import javax.inject.Inject;
@@ -89,10 +85,10 @@ import static com.github.adamantcheese.chan.core.settings.ChanSettings.LayoutMod
 import static com.github.adamantcheese.chan.core.settings.ChanSettings.LayoutMode.SLIDE;
 import static com.github.adamantcheese.chan.core.settings.ChanSettings.LayoutMode.SPLIT;
 import static com.github.adamantcheese.chan.ui.widget.DefaultAlertDialog.getDefaultAlertBuilder;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getApplicationLabel;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.isAndroid10;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.isTablet;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.openLink;
+import static java.util.concurrent.TimeUnit.HOURS;
 
 public class StartActivity
         extends AppCompatActivity
@@ -125,7 +121,7 @@ public class StartActivity
     @Inject
     WatchManager watchManager;
     @Inject
-    Gson gson;
+    FilterWatchManager filterWatchManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -137,6 +133,8 @@ public class StartActivity
         if (intentMismatchWorkaround()) {
             return;
         }
+
+        EmbeddingEngine.initEngine(this);
 
         ThemeHelper.init();
         ThemeHelper.setupContext(this);
@@ -208,7 +206,7 @@ public class StartActivity
                 return true;
             } else {
                 getDefaultAlertBuilder(this).setMessage(getString(R.string.open_link_not_matched,
-                        getApplicationLabel()
+                        BuildConfig.APP_LABEL
                 ))
                         .setPositiveButton(R.string.ok, (dialog, which) -> openLink(data.toString()))
                         .show();
@@ -366,7 +364,7 @@ public class StartActivity
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle outState) {
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
         super.onSaveInstanceState(outState);
 
         Loadable board = browseController.getLoadable();
@@ -485,7 +483,7 @@ public class StartActivity
     }
 
     @Override
-    public void onConfigurationChanged(Configuration newConfig) {
+    public void onConfigurationChanged(@NonNull Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
 
         if (isAndroid10() && (newConfig.uiMode & Configuration.UI_MODE_NIGHT_MASK) != currentNightModeBits
@@ -501,7 +499,7 @@ public class StartActivity
     @Override
     public void onBackPressed() {
         if (!stack.peek().onBack()) {
-            StartActivity.super.onBackPressed();
+            super.onBackPressed();
         }
     }
 
@@ -522,8 +520,6 @@ public class StartActivity
             return;
         }
 
-        updateManager.onDestroy();
-        imagePickDelegate.onDestroy();
         fileChooser.removeCallbacks();
 
         while (!stack.isEmpty()) {
@@ -532,6 +528,8 @@ public class StartActivity
             controller.onHide();
             controller.onDestroy();
         }
+
+        NetUtils.applicationClient.dispatcher().cancelAll();
     }
 
     @Override
@@ -579,6 +577,14 @@ public class StartActivity
     public void onEvent(Chan.ForegroundChangedMessage message) {
         if (!message.inForeground) {
             DatabaseUtils.runTaskAsync(databaseLoadableManager.purgeOld());
+            File requestedFiles = new File(getCacheDir(), "requested");
+            File[] files = requestedFiles.listFiles();
+            if (files == null) return;
+            for (File f : files) {
+                if (System.currentTimeMillis() > f.lastModified() + HOURS.toMillis(1)) {
+                    f.delete();
+                }
+            }
         }
     }
 
@@ -587,28 +593,15 @@ public class StartActivity
         startActivityForResult(intent, requestCode);
     }
 
-    private static final Type lruType = new TypeToken<Map<String, EmbedResult>>() {}.getType();
-
     @OnLifecycleEvent(Lifecycle.Event.ON_START)
     public void onStart() {
         super.onStart();
         EventBus.getDefault().register(this);
-        //restore parsed media title stuff
-        Map<String, EmbedResult> titles = gson.fromJson(PersistableChanState.videoTitleDurCache.get(), lruType);
-        //reconstruct
-        EmbeddingEngine.videoTitleDurCache = new LruCache<>(500);
-        for (Map.Entry<String, EmbedResult> entry : titles.entrySet()) {
-            EmbeddingEngine.videoTitleDurCache.put(entry.getKey(), entry.getValue());
-        }
     }
 
     @OnLifecycleEvent(Lifecycle.Event.ON_STOP)
     public void onStop() {
         super.onStop();
         EventBus.getDefault().unregister(this);
-        //store parsed media title stuff, extra prevention of unneeded API calls
-        PersistableChanState.videoTitleDurCache.set(gson.toJson(EmbeddingEngine.videoTitleDurCache.snapshot(),
-                lruType
-        ));
     }
 }

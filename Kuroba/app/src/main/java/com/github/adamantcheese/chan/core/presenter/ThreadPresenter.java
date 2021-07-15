@@ -17,26 +17,27 @@
 package com.github.adamantcheese.chan.core.presenter;
 
 import android.content.Context;
+import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.CheckBox;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.StartActivity;
-import com.github.adamantcheese.chan.core.cache.CacheHandler;
 import com.github.adamantcheese.chan.core.database.DatabaseLoadableManager;
 import com.github.adamantcheese.chan.core.database.DatabaseSavedReplyManager;
 import com.github.adamantcheese.chan.core.database.DatabaseUtils;
 import com.github.adamantcheese.chan.core.manager.BoardManager;
 import com.github.adamantcheese.chan.core.manager.ChanLoaderManager;
-import com.github.adamantcheese.chan.core.manager.FilterWatchManager;
 import com.github.adamantcheese.chan.core.manager.WatchManager;
 import com.github.adamantcheese.chan.core.model.ChanThread;
 import com.github.adamantcheese.chan.core.model.Post;
@@ -47,10 +48,12 @@ import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
 import com.github.adamantcheese.chan.core.model.orm.Pin;
 import com.github.adamantcheese.chan.core.model.orm.SavedReply;
+import com.github.adamantcheese.chan.core.net.NetUtils;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
 import com.github.adamantcheese.chan.core.repository.PageRepository;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
+import com.github.adamantcheese.chan.core.settings.ChanSettings.PostViewMode;
 import com.github.adamantcheese.chan.core.site.Site;
-import com.github.adamantcheese.chan.core.site.SiteActions;
 import com.github.adamantcheese.chan.core.site.archives.ExternalSiteArchive;
 import com.github.adamantcheese.chan.core.site.http.DeleteRequest;
 import com.github.adamantcheese.chan.core.site.http.DeleteResponse;
@@ -58,8 +61,8 @@ import com.github.adamantcheese.chan.core.site.loader.ChanThreadLoader;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser.ResolveLink;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser.SearchLink;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser.ThreadLink;
-import com.github.adamantcheese.chan.features.embedding.Embedder;
 import com.github.adamantcheese.chan.features.embedding.EmbeddingEngine;
+import com.github.adamantcheese.chan.features.embedding.embedders.Embedder;
 import com.github.adamantcheese.chan.ui.adapter.PostAdapter;
 import com.github.adamantcheese.chan.ui.adapter.PostsFilter;
 import com.github.adamantcheese.chan.ui.cell.PostCellInterface;
@@ -73,11 +76,9 @@ import com.github.adamantcheese.chan.ui.view.ThumbnailView;
 import com.github.adamantcheese.chan.utils.BackgroundUtils;
 import com.github.adamantcheese.chan.utils.Logger;
 import com.github.adamantcheese.chan.utils.PostUtils;
-import com.github.k1rakishou.fsaf.FileManager;
-import com.github.k1rakishou.fsaf.file.RawFile;
+import com.github.adamantcheese.chan.utils.RecyclerUtils.RecyclerViewPosition;
 
-import java.io.FileInputStream;
-import java.io.InputStream;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.GregorianCalendar;
@@ -88,7 +89,41 @@ import java.util.Set;
 
 import javax.inject.Inject;
 
+import okhttp3.Call;
+import okhttp3.Request;
+import okhttp3.Response;
+
 import static com.github.adamantcheese.chan.Chan.inject;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_COPY;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_COPY_CROSS_BOARD_LINK;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_COPY_IMG_URL;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_COPY_POST_LINK;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_COPY_POST_TEXT;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_COPY_POST_URL;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_DELETE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_EXTRA;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_COMMENT;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_FILENAME;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_FLAG_CODE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_ID;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_IMAGE_HASH;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_NAME;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_SUBJECT;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_FILTER_TRIPCODE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_HIDE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_HIGHLIGHT_ID;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_HIGHLIGHT_TRIPCODE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_INFO;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_OPEN_BROWSER;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_PIN;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_QUOTE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_QUOTE_TEXT;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_REMOVE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_REPORT;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_SAVE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_SHARE;
+import static com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions.POST_OPTION_UNSAVE;
 import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
 import static com.github.adamantcheese.chan.ui.widget.DefaultAlertDialog.getDefaultAlertBuilder;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
@@ -103,38 +138,6 @@ public class ThreadPresenter
                    PostCellInterface.PostCellCallback, ThreadStatusCell.Callback,
                    ThreadListLayout.ThreadListLayoutPresenterCallback, ArchivesLayout.Callback {
     //region Private Variables
-    private static final int POST_OPTION_QUOTE = 0;
-    private static final int POST_OPTION_QUOTE_TEXT = 1;
-    private static final int POST_OPTION_INFO = 2;
-    private static final int POST_OPTION_LINKS = 3;
-    private static final int POST_OPTION_COPY = 4;
-    private static final int POST_OPTION_REPORT = 5;
-    private static final int POST_OPTION_HIGHLIGHT_ID = 6;
-    private static final int POST_OPTION_DELETE = 7;
-    private static final int POST_OPTION_SAVE = 8;
-    private static final int POST_OPTION_UNSAVE = 9;
-    private static final int POST_OPTION_PIN = 10;
-    private static final int POST_OPTION_SHARE = 11;
-    private static final int POST_OPTION_HIGHLIGHT_TRIPCODE = 12;
-    private static final int POST_OPTION_HIDE = 13;
-    private static final int POST_OPTION_OPEN_BROWSER = 14;
-    private static final int POST_OPTION_FILTER = 15;
-    private static final int POST_OPTION_FILTER_TRIPCODE = 16;
-    private static final int POST_OPTION_FILTER_IMAGE_HASH = 17;
-    private static final int POST_OPTION_FILTER_SUBJECT = 18;
-    private static final int POST_OPTION_FILTER_COMMENT = 19;
-    private static final int POST_OPTION_FILTER_NAME = 20;
-    private static final int POST_OPTION_FILTER_ID = 21;
-    private static final int POST_OPTION_FILTER_FILENAME = 22;
-    private static final int POST_OPTION_FILTER_COUNTRY_CODE = 23;
-    private static final int POST_OPTION_EXTRA = 24;
-    private static final int POST_OPTION_REMOVE = 25;
-    private static final int POST_OPTION_COPY_POST_LINK = 26;
-    private static final int POST_OPTION_COPY_CROSS_BOARD_LINK = 27;
-    private static final int POST_OPTION_COPY_POST_TEXT = 28;
-    private static final int POST_OPTION_COPY_IMG_URL = 29;
-    private static final int POST_OPTION_COPY_POST_URL = 30;
-
     @Inject
     private WatchManager watchManager;
 
@@ -145,16 +148,7 @@ public class ThreadPresenter
     private DatabaseSavedReplyManager databaseSavedReplyManager;
 
     @Inject
-    private FileManager fileManager;
-
-    @Inject
-    private CacheHandler cacheHandler;
-
-    @Inject
     private BoardManager boardManager;
-
-    @Inject
-    private FilterWatchManager filterWatchManager;
 
     private final ThreadPresenterCallback threadPresenterCallback;
     private Loadable loadable;
@@ -163,8 +157,8 @@ public class ThreadPresenter
     private String searchQuery;
     private PostsFilter.Order order = PostsFilter.Order.BUMP;
     private final Context context;
-    private List<FloatingMenuItem<Integer>> filterMenu;
-    private List<FloatingMenuItem<Integer>> copyMenu;
+    private List<FloatingMenuItem<PostOptions>> filterMenu;
+    private List<FloatingMenuItem<PostOptions>> copyMenu;
     //endregion
 
     public ThreadPresenter(Context context, ThreadPresenterCallback callback) {
@@ -226,9 +220,14 @@ public class ThreadPresenter
         BackgroundUtils.ensureMainThread();
 
         if (isBound()) {
+            threadPresenterCallback.refreshUI();
             threadPresenterCallback.showLoading();
             chanLoader.requestData();
         }
+    }
+
+    public void refreshUI() {
+        showPosts();
     }
 
     public void onForegroundChanged(boolean foreground) {
@@ -243,27 +242,6 @@ public class ThreadPresenter
                 chanLoader.clearTimer();
             }
         }
-    }
-
-    public synchronized boolean pin() {
-        if (!isBound()) return false;
-        Pin pin = watchManager.findPinByLoadableId(loadable.id);
-        if (pin == null) {
-            if (chanLoader.getThread() != null) {
-                Post op = chanLoader.getThread().getOp();
-                loadable.thumbnailUrl = op.image() == null ? null : op.image().getThumbnailUrl();
-            }
-            watchManager.createPin(loadable);
-            return true;
-        }
-
-        if (pin.watching) {
-            watchManager.deletePin(pin);
-        } else {
-            watchManager.createPin(pin);
-        }
-
-        return true;
     }
 
     public void onSearchVisibilityChanged(boolean visible) {
@@ -302,8 +280,8 @@ public class ThreadPresenter
 
     public synchronized void showAlbum() {
         List<Post> posts = threadPresenterCallback.getDisplayingPosts();
-        int[] pos = threadPresenterCallback.getCurrentPosition();
-        int displayPosition = pos[0];
+        RecyclerViewPosition pos = threadPresenterCallback.getCurrentPosition();
+        int displayPosition = pos.index;
 
         List<PostImage> images = new ArrayList<>();
         int index = 0;
@@ -325,6 +303,11 @@ public class ThreadPresenter
     @Override
     public Loadable getLoadable() {
         return loadable;
+    }
+
+    @Override
+    public String getSearchQuery() {
+        return searchQuery;
     }
 
     /*
@@ -376,7 +359,7 @@ public class ThreadPresenter
             }
 
             if (more > 0 && loadable.no == result.getLoadable().no) {
-                threadPresenterCallback.showNewPostsSnackbar(more);
+                threadPresenterCallback.showNewPostsSnackbar(loadable, more);
             }
         }
 
@@ -410,7 +393,7 @@ public class ThreadPresenter
     @Override
     public void onListScrolledToBottom() {
         if (!isBound()) return;
-        if (chanLoader.getThread() != null && loadable.isThreadMode() && chanLoader.getThread().getPosts().size() > 0) {
+        if (chanLoader.getThread() != null && loadable.isThreadMode() && !chanLoader.getThread().getPosts().isEmpty()) {
             List<Post> posts = chanLoader.getThread().getPosts();
             loadable.lastViewed = posts.get(posts.size() - 1).no;
         }
@@ -420,7 +403,7 @@ public class ThreadPresenter
             watchManager.onBottomPostViewed(pin);
         }
 
-        threadPresenterCallback.showNewPostsSnackbar(-1);
+        threadPresenterCallback.showNewPostsSnackbar(loadable, -1);
 
         // Update the last seen indicator
         showPosts();
@@ -549,13 +532,27 @@ public class ThreadPresenter
         List<PostImage> images = new ArrayList<>();
         int index = -1;
         List<Post> posts = threadPresenterCallback.getDisplayingPosts();
-        for (Post item : posts) {
-            for (PostImage image : item.images) {
-                if (!item.deleted.get() || cacheHandler.exists(image.imageUrl)) {
+        PostViewMode viewMode = threadPresenterCallback.getPostViewMode();
+        for (Post post : posts) {
+            // for card mode, only add the displayed image
+            // otherwise add all images
+            if (viewMode == PostViewMode.GRID) {
+                if (post.image() == null) continue;
+                if (!post.deleted.get() || post.image().isInlined || NetUtils.isCached(post.image().imageUrl)) {
                     //deleted posts always have 404'd images, but let it through if the file exists in cache
-                    images.add(image);
-                    if (image.equals(postImage)) {
+                    images.add(post.image());
+                    if (post.image().equals(postImage)) {
                         index = images.size() - 1;
+                    }
+                }
+            } else {
+                for (PostImage image : post.images) {
+                    if (!post.deleted.get() || image.isInlined || NetUtils.isCached(image.imageUrl)) {
+                        //deleted posts always have 404'd images, but let it through if the file exists in cache
+                        images.add(image);
+                        if (image.equals(postImage)) {
+                            index = images.size() - 1;
+                        }
                     }
                 }
             }
@@ -568,7 +565,7 @@ public class ThreadPresenter
 
     @Override
     public Object onPopulatePostOptions(
-            Post post, List<FloatingMenuItem<Integer>> menu, List<FloatingMenuItem<Integer>> extraMenu
+            Post post, List<FloatingMenuItem<PostOptions>> menu, List<FloatingMenuItem<PostOptions>> extraMenu
     ) {
         if (!isBound()) return null;
 
@@ -585,7 +582,7 @@ public class ThreadPresenter
             menu.add(new FloatingMenuItem<>(POST_OPTION_PIN, R.string.action_pin));
         }
 
-        if (loadable.site.siteFeature(Site.SiteFeature.POSTING)) {
+        if (loadable.site.siteFeature(Site.SiteFeature.POSTING) && !loadable.isCatalogMode()) {
             menu.add(new FloatingMenuItem<>(POST_OPTION_QUOTE, R.string.post_quote));
             menu.add(new FloatingMenuItem<>(POST_OPTION_QUOTE_TEXT, R.string.post_quote_text));
         }
@@ -627,9 +624,6 @@ public class ThreadPresenter
 
         menu.add(new FloatingMenuItem<>(POST_OPTION_EXTRA, R.string.post_more));
 
-        if (post.linkables.size() > 0) {
-            extraMenu.add(new FloatingMenuItem<>(POST_OPTION_LINKS, R.string.post_show_links));
-        }
         extraMenu.add(new FloatingMenuItem<>(POST_OPTION_OPEN_BROWSER, R.string.action_open_browser));
         extraMenu.add(new FloatingMenuItem<>(POST_OPTION_SHARE, R.string.post_share));
 
@@ -639,7 +633,7 @@ public class ThreadPresenter
         if (filterMenu.size() > 1) {
             extraMenu.add(new FloatingMenuItem<>(POST_OPTION_FILTER, R.string.post_filter));
         } else if (filterMenu.size() == 1) {
-            FloatingMenuItem<Integer> menuItem = filterMenu.remove(0);
+            FloatingMenuItem<PostOptions> menuItem = filterMenu.remove(0);
             extraMenu.add(new FloatingMenuItem<>(menuItem.getId(), "Filter " + menuItem.getText().toLowerCase()));
         }
 
@@ -652,8 +646,8 @@ public class ThreadPresenter
         return POST_OPTION_EXTRA;
     }
 
-    public void onPostOptionClicked(View anchor, Post post, Object id, boolean inPopup) {
-        switch ((Integer) id) {
+    public void onPostOptionClicked(View anchor, Post post, PostOptions id, boolean inPopup) {
+        switch (id) {
             case POST_OPTION_QUOTE:
                 threadPresenterCallback.hidePostsPopup();
                 threadPresenterCallback.quote(post, false);
@@ -664,49 +658,6 @@ public class ThreadPresenter
                 break;
             case POST_OPTION_INFO:
                 showPostInfo(post);
-                break;
-            case POST_OPTION_LINKS:
-                Set<String> added = new HashSet<>();
-                List<CharSequence> keys = new ArrayList<>();
-                for (PostLinkable linkable : post.linkables) {
-                    //skip SPOILER linkables, they aren't useful to display
-                    if (linkable.type == PostLinkable.Type.SPOILER) continue;
-                    String key = linkable.key.toString();
-                    String value = linkable.value.toString();
-                    //need to trim off starting spaces for certain media links if embedded
-                    String trimmedUrl = (key.charAt(0) == ' ' && key.charAt(1) == ' ') ? key.substring(2) : key;
-                    boolean speciallyProcessed = false;
-                    for (Embedder<?> e : EmbeddingEngine.getInstance().getEmbedders()) {
-                        if (e.shouldEmbed(value, loadable.board)) {
-                            if (added.contains(trimmedUrl)) continue;
-                            keys.add(PostHelper.prependIcon(context, trimmedUrl, e.getIconBitmap(), sp(16)));
-                            added.add(trimmedUrl);
-                            speciallyProcessed = true;
-                            break;
-                        }
-                    }
-                    if (!speciallyProcessed) {
-                        keys.add(key);
-                    }
-                }
-
-                AlertDialog dialog = getDefaultAlertBuilder(context).create();
-
-                ListView clickables = new ListView(context);
-                clickables.setAdapter(new ArrayAdapter<>(context, R.layout.simple_list_item, keys));
-                clickables.setOnItemClickListener((parent, view, position, id1) -> {
-                    onPostLinkableClicked(post, new ArrayList<>(post.linkables).get(position));
-                    dialog.dismiss();
-                });
-                clickables.setOnItemLongClickListener((parent, view, position, id1) -> {
-                    setClipboardContent("Linkable URL", new ArrayList<>(post.linkables).get(position).value.toString());
-                    showToast(context, R.string.linkable_copied_to_clipboard);
-                    return true;
-                });
-
-                dialog.setView(clickables);
-                dialog.setCanceledOnTouchOutside(true);
-                dialog.show();
                 break;
             case POST_OPTION_COPY:
                 showSubMenuOptions(anchor, post, inPopup, copyMenu);
@@ -722,7 +673,7 @@ public class ThreadPresenter
                 showToast(context, R.string.post_cross_board_link_copied);
                 break;
             case POST_OPTION_COPY_POST_URL:
-                setClipboardContent("Post URL", loadable.site.resolvable().desktopUrl(loadable, post.no));
+                setClipboardContent("Post URL", loadable.desktopUrl(post));
                 showToast(context, R.string.post_url_copied);
                 break;
             case POST_OPTION_COPY_IMG_URL:
@@ -760,8 +711,8 @@ public class ThreadPresenter
             case POST_OPTION_FILTER_FILENAME:
                 threadPresenterCallback.filterPostFilename(post);
                 break;
-            case POST_OPTION_FILTER_COUNTRY_CODE:
-                threadPresenterCallback.filterPostCountryCode(post);
+            case POST_OPTION_FILTER_FLAG_CODE:
+                threadPresenterCallback.filterPostFlagCode(post);
                 break;
             case POST_OPTION_FILTER_ID:
                 threadPresenterCallback.filterPostID(post.id);
@@ -817,12 +768,12 @@ public class ThreadPresenter
                 break;
             case POST_OPTION_OPEN_BROWSER:
                 if (isBound()) {
-                    openLink(loadable.site.resolvable().desktopUrl(loadable, post.no));
+                    openLink(loadable.desktopUrl(post));
                 }
                 break;
             case POST_OPTION_SHARE:
                 if (isBound()) {
-                    shareLink(loadable.site.resolvable().desktopUrl(loadable, post.no));
+                    shareLink(loadable.desktopUrl(post));
                 }
                 break;
             case POST_OPTION_REMOVE:
@@ -831,7 +782,7 @@ public class ThreadPresenter
                     break;
                 }
 
-                boolean hide = ((Integer) id) == POST_OPTION_HIDE;
+                boolean hide = id == POST_OPTION_HIDE;
 
                 if (chanLoader.getThread().getLoadable().mode == Loadable.Mode.CATALOG) {
                     threadPresenterCallback.hideThread(post, post.no, hide);
@@ -867,11 +818,13 @@ public class ThreadPresenter
         return matching;
     }
 
-    private void showSubMenuOptions(View anchor, Post post, Boolean inPopup, List<FloatingMenuItem<Integer>> options) {
-        FloatingMenu<Integer> menu = new FloatingMenu<>(context, anchor, options);
-        menu.setCallback(new FloatingMenu.ClickCallback<Integer>() {
+    private void showSubMenuOptions(
+            View anchor, Post post, Boolean inPopup, List<FloatingMenuItem<PostOptions>> options
+    ) {
+        FloatingMenu<PostOptions> menu = new FloatingMenu<>(context, anchor, options);
+        menu.setCallback(new FloatingMenu.ClickCallback<PostOptions>() {
             @Override
-            public void onFloatingMenuItemClicked(FloatingMenu<Integer> menu, FloatingMenuItem<Integer> item) {
+            public void onFloatingMenuItemClicked(FloatingMenu<PostOptions> menu, FloatingMenuItem<PostOptions> item) {
                 onPostOptionClicked(anchor, post, item.getId(), inPopup);
             }
         });
@@ -886,12 +839,12 @@ public class ThreadPresenter
             if (linked != null) {
                 threadPresenterCallback.showPostsPopup(post, Collections.singletonList(linked));
             }
-        } else if (linkable.type == PostLinkable.Type.LINK) {
-            threadPresenterCallback.openLink((String) linkable.value);
+        } else if (linkable.type == PostLinkable.Type.LINK || linkable.type == PostLinkable.Type.EMBED) {
+            threadPresenterCallback.openLink(linkable, (String) linkable.value);
         } else if (linkable.type == PostLinkable.Type.THREAD) {
             ThreadLink link = (ThreadLink) linkable.value;
 
-            Board board = loadable.site.board(link.board);
+            Board board = loadable.site.board(link.boardCode);
             if (board != null) {
                 Loadable thread =
                         Loadable.forThread(board, link.threadId, "", !(board.site instanceof ExternalSiteArchive));
@@ -917,12 +870,14 @@ public class ThreadPresenter
         } else if (linkable.type == PostLinkable.Type.ARCHIVE) {
             if (linkable.value instanceof ThreadLink) {
                 ThreadLink opPostPair = (ThreadLink) linkable.value;
-                Loadable constructed =
-                        Loadable.forThread(Board.fromSiteNameCode(loadable.site, opPostPair.board, opPostPair.board),
-                                opPostPair.threadId,
-                                "",
-                                false
-                        );
+                Loadable constructed = Loadable.forThread(Board.fromSiteNameCode(loadable.site,
+                        opPostPair.boardCode,
+                        opPostPair.boardCode
+                        ),
+                        opPostPair.threadId,
+                        "",
+                        false
+                );
                 showArchives(constructed, opPostPair.postId);
             } else if (linkable.value instanceof ResolveLink) {
                 ResolveLink toResolve = (ResolveLink) linkable.value;
@@ -930,9 +885,10 @@ public class ThreadPresenter
                     showToast(context, "Calling archive API, just a moment!");
                     toResolve.resolve((threadLink) -> {
                         if (threadLink != null) {
-                            Loadable constructed = Loadable.forThread(Board.fromSiteNameCode(toResolve.board.site,
-                                    threadLink.board,
-                                    threadLink.board
+                            Loadable constructed = Loadable.forThread(
+                                    Board.fromSiteNameCode(toResolve.board.site,
+                                            threadLink.boardCode,
+                                            threadLink.boardCode
                                     ),
                                     threadLink.threadId,
                                     "",
@@ -949,16 +905,20 @@ public class ThreadPresenter
                     showArchives(constructed, toResolve.postId);
                 }
             }
+        } else if (linkable.type == PostLinkable.Type.JAVASCRIPT) {
+            threadPresenterCallback.openLink(linkable, loadable.desktopUrl(post));
         }
     }
 
     @Override
     public void onPostNoClicked(Post post) {
+        threadPresenterCallback.hidePostsPopup();
         threadPresenterCallback.quote(post, false);
     }
 
     @Override
     public void onPostSelectionQuoted(Post post, CharSequence quoted) {
+        threadPresenterCallback.hidePostsPopup();
         threadPresenterCallback.quote(post, quoted);
     }
 
@@ -1007,8 +967,8 @@ public class ThreadPresenter
 
     @Override
     public void onListStatusClicked() {
-        if (!isBound()) return;
-        if (!chanLoader.getThread().isArchived()) {
+        if (!isBound() || getChanThread() == null) return;
+        if (!getChanThread().isArchived()) {
             chanLoader.requestMoreData();
         } else {
             showArchives(loadable, loadable.no);
@@ -1075,10 +1035,10 @@ public class ThreadPresenter
 
         SavedReply reply = databaseSavedReplyManager.getSavedReply(post.board, post.no);
         if (reply != null) {
-            post.board.site.actions()
-                    .delete(new DeleteRequest(post, reply, onlyImageDelete), new SiteActions.DeleteListener() {
+            post.board.site.actions().delete(new DeleteRequest(post, reply, onlyImageDelete),
+                    new NetUtilsClasses.ResponseResult<DeleteResponse>() {
                         @Override
-                        public void onDeleteComplete(DeleteResponse deleteResponse) {
+                        public void onSuccess(DeleteResponse deleteResponse) {
                             String message;
                             if (deleteResponse.deleted) {
                                 message = getString(R.string.delete_success);
@@ -1091,15 +1051,24 @@ public class ThreadPresenter
                         }
 
                         @Override
-                        public void onDeleteError(Exception e) {
+                        public void onFailure(Exception e) {
                             threadPresenterCallback.hideDeleting(getString(R.string.delete_error));
                         }
-                    });
+                    }
+            );
         }
     }
 
     private void showPostInfo(Post post) {
-        StringBuilder text = new StringBuilder();
+        View fullView = LayoutInflater.from(context).inflate(R.layout.dialog_post_info, null);
+        AlertDialog dialog =
+                getDefaultAlertBuilder(context).setView(fullView).setPositiveButton(R.string.ok, null).create();
+        dialog.setCanceledOnTouchOutside(true);
+        TextView infoText = fullView.findViewById(R.id.post_info);
+        LinearLayout linkableGroup = fullView.findViewById(R.id.linkable_group);
+        ListView linkableList = fullView.findViewById(R.id.post_linkable_list);
+
+        SpannableStringBuilder text = new SpannableStringBuilder();
         if (post.isOP && !TextUtils.isEmpty(post.subject)) {
             text.append("Subject: ").append(post.subject).append("\n");
         }
@@ -1125,18 +1094,12 @@ public class ThreadPresenter
                 }
             } catch (Exception ignored) {
             }
-            text.append("Post count: ").append(count).append("\n");
+            text.append("Post count: ").append(Integer.toString(count)).append("\n");
         }
 
         if (post.httpIcons != null && !post.httpIcons.isEmpty()) {
             for (PostHttpIcon icon : post.httpIcons) {
-                if (icon.url.toString().contains("troll")) {
-                    text.append("Troll Country: ").append(icon.name).append("\n");
-                } else if (icon.url.toString().contains("country")) {
-                    text.append("Country: ").append(icon.name).append("\n");
-                } else if (icon.url.toString().contains("minileaf")) {
-                    text.append("4chan Pass Year: ").append(icon.name).append("\n");
-                }
+                text.append("Icon ").append(icon.code).append(" description: ").append(icon.description).append("\n");
             }
         }
 
@@ -1144,27 +1107,45 @@ public class ThreadPresenter
 
         for (PostImage image : post.images) {
             text.append("\n\nFilename: ").append(image.filename).append(".").append(image.extension);
-            if ("webm".equals(image.extension.toLowerCase()) && cacheHandler.exists(image.imageUrl)) {
-                RawFile file = cacheHandler.getOrCreateCacheFile(image.imageUrl);
-                try (InputStream stream = new FileInputStream(file.getFullPath())) {
-                    byte[] bytes = new byte[1024];
-                    stream.read(bytes);
-                    for (int i = 0; i < bytes.length - 1; i++) {
-                        if (((bytes[i] & 0xFF) << 8 | bytes[i + 1] & 0xFF) == 0x7ba9) {
-                            text.append("\nMetadata title: ");
-                            byte len = (byte) (bytes[i + 2] ^ 0x80);
-                            for (byte j = 0; j < len; j++) {
-                                text.append((char) bytes[i + 2 + j + 1]);
+            if ("webm".equals(image.extension.toLowerCase())) {
+                // check webms for extra titles, async
+                // this is a super simple example of what the embedding engine does, basically
+                String checking = "\nChecking for metadata titles…";
+                text.append(checking);
+                Call call = NetUtils.applicationClient.newCall(new Request.Builder().url(image.imageUrl).build());
+                call.enqueue(new NetUtilsClasses.IgnoreFailureCallback() {
+                    @Override
+                    public void onResponse(@NonNull Call call, @NonNull Response response)
+                            throws IOException {
+                        int index = text.toString().indexOf(checking);
+                        String replaceText = ""; // clears out text if nothing found
+
+                        byte[] bytes = new byte[2048];
+                        response.body().source().read(bytes);
+                        response.close();
+                        for (int i = 0; i < bytes.length - 1; i++) {
+                            if (((bytes[i] & 0xFF) << 8 | bytes[i + 1] & 0xFF) == 0x7ba9) {
+                                byte len = (byte) (bytes[i + 2] ^ 0x80);
+                                // i is the position of the length bytes, which are 2 bytes
+                                // 1 after that is the actual string start
+                                replaceText = "\nMetadata title: " + new String(bytes, i + 2 + 1, len);
+                                break;
                             }
-                            break;
                         }
+                        text.replace(index, index + checking.length(), replaceText);
+                        // update on main thread, this is an OkHttp thread
+                        BackgroundUtils.runOnMainThread(() -> infoText.setText(text));
                     }
-                } catch (Exception ignored) {}
+                });
+                dialog.setOnDismissListener(dialog1 -> call.cancel());
             }
             if (image.isInlined) {
                 text.append("\nLinked file");
             } else {
-                text.append("\nDimensions: ").append(image.imageWidth).append("x").append(image.imageHeight);
+                text.append("\nDimensions: ")
+                        .append(Integer.toString(image.imageWidth))
+                        .append("x")
+                        .append(Integer.toString(image.imageHeight));
             }
 
             if (image.size > 0) {
@@ -1175,16 +1156,48 @@ public class ThreadPresenter
                 text.append("\nSpoilered");
             }
         }
+        infoText.setText(text);
 
-        AlertDialog dialog = getDefaultAlertBuilder(context).setMessage(text.toString())
-                .setTitle(R.string.post_info)
-                .setPositiveButton(R.string.ok, null)
-                .create();
-        dialog.show();
-        View messageView = dialog.findViewById(android.R.id.message);
-        if (messageView instanceof TextView) {
-            ((TextView) messageView).setTextIsSelectable(true);
+        Set<String> added = new HashSet<>();
+        List<CharSequence> keys = new ArrayList<>();
+        List<PostLinkable> linkables = post.getLinkables();
+        for (PostLinkable linkable : linkables) {
+            //skip SPOILER linkables, they aren't useful to display
+            if (linkable.type == PostLinkable.Type.SPOILER) continue;
+            String key = linkable.key.toString();
+            String value = linkable.value.toString();
+            //need to trim off starting spaces for certain media links if embedded
+            String trimmedUrl = (key.charAt(0) == ' ' && key.charAt(1) == ' ') ? key.substring(2) : key;
+            boolean speciallyProcessed = false;
+            // context doesn't matter here
+            for (Embedder e : EmbeddingEngine.getInstance().getEmbedders()) {
+                if (e.shouldEmbed(value)) {
+                    if (added.contains(trimmedUrl)) continue;
+                    keys.add(PostHelper.prependIcon(context, trimmedUrl, e.getIconBitmap(), sp(16)));
+                    added.add(trimmedUrl);
+                    speciallyProcessed = true;
+                    break;
+                }
+            }
+            if (!speciallyProcessed) {
+                keys.add(key);
+            }
         }
+
+        linkableList.setAdapter(new ArrayAdapter<>(context, R.layout.simple_list_item_thin, keys));
+        linkableList.setOnItemClickListener((parent, view, position, id1) -> {
+            onPostLinkableClicked(post, linkables.get(position));
+            dialog.dismiss();
+        });
+        linkableList.setOnItemLongClickListener((parent, view, position, id1) -> {
+            setClipboardContent("Linkable URL", linkables.get(position).value.toString());
+            showToast(context, R.string.linkable_copied_to_clipboard);
+            return true;
+        });
+        if (linkables.size() <= 0) {
+            linkableGroup.setVisibility(View.GONE);
+        }
+        dialog.show();
     }
 
     private void showPosts() {
@@ -1239,8 +1252,8 @@ public class ThreadPresenter
         }
     }
 
-    private List<FloatingMenuItem<Integer>> populateFilterMenuOptions(Post post) {
-        List<FloatingMenuItem<Integer>> filterMenu = new ArrayList<>();
+    private List<FloatingMenuItem<PostOptions>> populateFilterMenuOptions(Post post) {
+        List<FloatingMenuItem<PostOptions>> filterMenu = new ArrayList<>();
         if (post.isOP && !TextUtils.isEmpty(post.subject)) {
             filterMenu.add(new FloatingMenuItem<>(POST_OPTION_FILTER_SUBJECT, R.string.filter_subject));
         }
@@ -1256,8 +1269,8 @@ public class ThreadPresenter
         if (!TextUtils.isEmpty(post.tripcode)) {
             filterMenu.add(new FloatingMenuItem<>(POST_OPTION_FILTER_TRIPCODE, R.string.filter_tripcode));
         }
-        if (loadable.board.countryFlags) {
-            filterMenu.add(new FloatingMenuItem<>(POST_OPTION_FILTER_COUNTRY_CODE, R.string.filter_country_code));
+        if (loadable.board.countryFlags || !loadable.board.boardFlags.isEmpty()) {
+            filterMenu.add(new FloatingMenuItem<>(POST_OPTION_FILTER_FLAG_CODE, R.string.filter_flag_code));
         }
         if (!post.images.isEmpty()) {
             filterMenu.add(new FloatingMenuItem<>(POST_OPTION_FILTER_FILENAME, R.string.filter_filename));
@@ -1268,8 +1281,8 @@ public class ThreadPresenter
         return filterMenu;
     }
 
-    private List<FloatingMenuItem<Integer>> populateCopyMenuOptions(Post post) {
-        List<FloatingMenuItem<Integer>> copyMenu = new ArrayList<>();
+    private List<FloatingMenuItem<PostOptions>> populateCopyMenuOptions(Post post) {
+        List<FloatingMenuItem<PostOptions>> copyMenu = new ArrayList<>();
         if (!TextUtils.isEmpty(post.comment)) {
             copyMenu.add(new FloatingMenuItem<>(POST_OPTION_COPY_POST_TEXT, R.string.post_copy_text));
         }
@@ -1280,9 +1293,6 @@ public class ThreadPresenter
             copyMenu.add(new FloatingMenuItem<>(POST_OPTION_COPY_IMG_URL, R.string.post_copy_image_url));
         }
         copyMenu.add(new FloatingMenuItem<>(POST_OPTION_INFO, R.string.post_info));
-        if (post.linkables.size() > 0) {
-            copyMenu.add(new FloatingMenuItem<>(POST_OPTION_LINKS, R.string.post_copy_links));
-        }
         return copyMenu;
     }
 
@@ -1297,13 +1307,15 @@ public class ThreadPresenter
 
         void showEmpty();
 
+        void refreshUI();
+
         void showThread(Loadable threadLoadable);
 
         void showBoard(Loadable catalogLoadable);
 
         void showBoardAndSearch(Loadable catalogLoadable, String searchQuery);
 
-        void openLink(String link);
+        void openLink(PostLinkable linkable, String link);
 
         void openReportView(Post post);
 
@@ -1313,7 +1325,9 @@ public class ThreadPresenter
 
         List<Post> getDisplayingPosts();
 
-        int[] getCurrentPosition();
+        PostViewMode getPostViewMode();
+
+        RecyclerViewPosition getCurrentPosition();
 
         void showImages(List<PostImage> images, int index, Loadable loadable, ThumbnailView thumbnail);
 
@@ -1337,7 +1351,7 @@ public class ThreadPresenter
 
         void filterPostID(String ID);
 
-        void filterPostCountryCode(Post post);
+        void filterPostFlagCode(Post post);
 
         void filterPostFilename(Post post);
 
@@ -1359,7 +1373,7 @@ public class ThreadPresenter
 
         void hideThread(Post post, int threadNo, boolean hide);
 
-        void showNewPostsSnackbar(int more);
+        void showNewPostsSnackbar(final Loadable loadable, int more);
 
         void showHideOrRemoveWholeChainDialog(boolean hide, Post post, int threadNo);
 

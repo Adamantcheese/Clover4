@@ -20,14 +20,17 @@ import android.content.Context;
 
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.core.presenter.SiteSetupPresenter;
+import com.github.adamantcheese.chan.core.settings.primitives.BooleanSetting;
 import com.github.adamantcheese.chan.core.settings.primitives.OptionsSetting;
 import com.github.adamantcheese.chan.core.settings.primitives.StringSetting;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.SiteSetting;
 import com.github.adamantcheese.chan.ui.controller.settings.SettingsController;
+import com.github.adamantcheese.chan.ui.settings.BooleanSettingView;
 import com.github.adamantcheese.chan.ui.settings.LinkSettingView;
 import com.github.adamantcheese.chan.ui.settings.ListSettingView;
 import com.github.adamantcheese.chan.ui.settings.ListSettingView.Item;
+import com.github.adamantcheese.chan.ui.settings.SettingView;
 import com.github.adamantcheese.chan.ui.settings.SettingsGroup;
 import com.github.adamantcheese.chan.ui.settings.StringSettingView;
 
@@ -88,6 +91,8 @@ public class SiteSetupController
         SettingsGroup group = new SettingsGroup("Additional settings");
 
         for (SiteSetting<?> setting : settings) {
+            SettingView generated;
+
             switch (setting.type) {
                 case OPTIONS:
                     // Turn the SiteSetting for a list of options into a proper setting with a
@@ -99,25 +104,31 @@ public class SiteSetupController
                     for (int i = 0; i < settingItems.length; i++) {
                         String name = setting.optionNames.get(i);
                         Enum anEnum = settingItems[i];
-                        items.add(new Item<>(name, anEnum));
+                        if (name != null) {
+                            items.add(new Item<>(name, anEnum));
+                        }
                     }
 
                     //noinspection unchecked
-                    ListSettingView<?> v = new ListSettingView<>(this, optionsSetting, setting.name, items);
-
-                    group.add(v);
+                    generated = new ListSettingView<>(this, optionsSetting, setting.name, items);
                     break;
                 case STRING:
                     // Turn the SiteSetting for a string setting into a proper setting with a name and input
-                    StringSetting stringSetting = (StringSetting) setting.setting;
-                    StringSettingView view =
-                            new StringSettingView(this, stringSetting, setting.name, setting.name, null);
-
-                    group.add(view);
+                    generated = new StringSettingView(this,
+                            (StringSetting) setting.setting,
+                            setting.name,
+                            setting.name,
+                            null
+                    );
+                    break;
+                case BOOLEAN:
+                    generated = new BooleanSettingView(this, (BooleanSetting) setting.setting, setting.name, null);
                     break;
                 default:
                     throw new UnsupportedOperationException("Not implemented yet for this setting type!");
             }
+
+            group.add(generated);
         }
 
         groups.add(group);
@@ -127,7 +138,7 @@ public class SiteSetupController
     public void showLogin() {
         SettingsGroup login = new SettingsGroup(R.string.setup_site_group_login);
 
-        loginLink = new LinkSettingView(this, getString(R.string.setup_site_login), "", v -> {
+        loginLink = new LinkSettingView(this, getString(R.string.setup_site_login), "", (v, sv) -> {
             LoginController loginController = new LoginController(context, site);
             navigationController.pushController(loginController);
         });
@@ -141,7 +152,7 @@ public class SiteSetupController
     protected void populatePreferences() {
         SettingsGroup general = new SettingsGroup(R.string.setup_site_group_general);
 
-        boardsLink = new LinkSettingView(this, getString(R.string.setup_site_boards), "", v -> {
+        boardsLink = new LinkSettingView(this, getString(R.string.setup_site_boards), "", (v, sv) -> {
             BoardSetupController boardSetupController = new BoardSetupController(context);
             boardSetupController.setSite(site);
             navigationController.pushController(boardSetupController);

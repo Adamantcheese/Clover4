@@ -23,10 +23,12 @@ import android.content.Intent;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 
+import com.github.adamantcheese.chan.BuildConfig;
 import com.github.adamantcheese.chan.Chan;
 import com.github.adamantcheese.chan.core.receiver.WakeUpdateReceiver;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
 import com.github.adamantcheese.chan.utils.Logger;
+import com.github.adamantcheese.chan.utils.StringUtils;
 
 import org.greenrobot.eventbus.EventBus;
 import org.greenrobot.eventbus.Subscribe;
@@ -37,27 +39,35 @@ import java.util.Map;
 import java.util.Set;
 
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAppContext;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.getApplicationLabel;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 /**
  * Deals with background alarms specifically. No foreground stuff here.
  */
 public class WakeManager {
+    private static WakeManager instance;
     private final Map<Object, WakeLock> wakeLocks = new HashMap<>();
 
     private final AlarmManager alarmManager;
     private final PowerManager powerManager;
 
     private final Set<Wakeable> wakeableSet = new HashSet<>();
-    public static final Intent intent = new Intent(getAppContext(), WakeUpdateReceiver.class);
-    private final PendingIntent pendingIntent = PendingIntent.getBroadcast(getAppContext(), 1, intent, 0);
-    private long lastBackgroundUpdateTime = System.currentTimeMillis();
+    private final PendingIntent pendingIntent =
+            PendingIntent.getBroadcast(getAppContext(), 1, new Intent(getAppContext(), WakeUpdateReceiver.class), 0);
+    // allow the wake manager to run at construction time; this will be used in the first onEvent call
+    private long lastBackgroundUpdateTime = System.currentTimeMillis() - ChanSettings.watchBackgroundInterval.get();
     private boolean alarmRunning;
 
-    public WakeManager() {
+    public static WakeManager getInstance() {
+        if (instance == null) {
+            instance = new WakeManager();
+        }
+
+        return instance;
+    }
+
+    private WakeManager() {
         alarmManager = (AlarmManager) getAppContext().getSystemService(Context.ALARM_SERVICE);
         powerManager = (PowerManager) getAppContext().getSystemService(Context.POWER_SERVICE);
 
@@ -69,10 +79,12 @@ public class WakeManager {
     }
 
     public void onBroadcastReceived(boolean doCheck) {
-        if (doCheck && System.currentTimeMillis() - lastBackgroundUpdateTime < SECONDS.toMillis(90)) {
-            Logger.d(this, "Background update broadcast ignored because it was requested too soon");
+        long currentTime = System.currentTimeMillis();
+        Logger.d(this, "Alarm trigger @ " + StringUtils.getTimeDefaultLocale(currentTime));
+        if (doCheck && currentTime - lastBackgroundUpdateTime < ChanSettings.watchBackgroundInterval.get()) {
+            Logger.d(this, "Early; previous @ " + StringUtils.getTimeDefaultLocale(lastBackgroundUpdateTime));
         } else {
-            lastBackgroundUpdateTime = System.currentTimeMillis();
+            lastBackgroundUpdateTime = currentTime;
             for (Wakeable wakeable : wakeableSet) {
                 wakeable.onWake();
             }
@@ -157,7 +169,7 @@ public class WakeManager {
             }
 
             wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,
-                    getApplicationLabel() + ":WakeManagerUpdateLock:" + Object.class.getSimpleName()
+                    BuildConfig.APP_LABEL + ":WakeManagerUpdateLock:" + Object.class.getSimpleName()
             );
             wakeLock.setReferenceCounted(false);
             wakeLock.acquire(MINUTES.toMillis(1));

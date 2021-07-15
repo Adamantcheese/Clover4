@@ -23,10 +23,8 @@ import android.os.Build;
 
 import androidx.annotation.NonNull;
 
-import com.github.adamantcheese.chan.core.cache.downloader.FileCacheException;
 import com.github.adamantcheese.chan.core.di.AppModule;
 import com.github.adamantcheese.chan.core.di.ManagerModule;
-import com.github.adamantcheese.chan.core.di.NetModule;
 import com.github.adamantcheese.chan.core.di.RepositoryModule;
 import com.github.adamantcheese.chan.core.manager.BoardManager;
 import com.github.adamantcheese.chan.core.manager.ReportManager;
@@ -34,11 +32,13 @@ import com.github.adamantcheese.chan.core.manager.SettingsNotificationManager;
 import com.github.adamantcheese.chan.core.manager.SettingsNotificationManager.SettingNotification;
 import com.github.adamantcheese.chan.core.net.NetUtils;
 import com.github.adamantcheese.chan.core.repository.BitmapRepository;
+import com.github.adamantcheese.chan.core.repository.DrawableRepository;
 import com.github.adamantcheese.chan.core.repository.SiteRepository;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
 import com.github.adamantcheese.chan.ui.service.LastPageNotification;
 import com.github.adamantcheese.chan.ui.service.SavingNotification;
 import com.github.adamantcheese.chan.ui.service.WatchNotification;
+import com.github.adamantcheese.chan.ui.widget.CancellableSnackbar;
 import com.github.adamantcheese.chan.ui.widget.CancellableToast;
 import com.github.adamantcheese.chan.utils.AndroidUtils;
 import com.github.adamantcheese.chan.utils.BackgroundUtils;
@@ -107,12 +107,13 @@ public class Chan
 
         AndroidUtils.init(this);
         BitmapRepository.initialize(this);
+        DrawableRepository.initialize(this);
 
         WatchNotification.setupChannel();
         SavingNotification.setupChannel();
         LastPageNotification.setupChannel();
 
-        feather = Feather.with(new AppModule(), new NetModule(), new RepositoryModule(), new ManagerModule());
+        feather = Feather.with(new AppModule(), new RepositoryModule(), new ManagerModule());
         feather.injectFields(this);
 
         siteRepository.initialize();
@@ -138,11 +139,6 @@ public class Chan
             if (e instanceof RuntimeException && e.getCause() instanceof InterruptedException) {
                 // fine, DB synchronous call (via runTask) was interrupted when a reactive stream
                 // was disposed of.
-                return;
-            }
-            if (e instanceof FileCacheException.CancellationException
-                    || e instanceof FileCacheException.FileNotFoundOnTheServerException) {
-                // fine, sometimes they get through all the checks but it doesn't really matter
                 return;
             }
             if ((e instanceof NullPointerException) || (e instanceof IllegalArgumentException)) {
@@ -176,15 +172,16 @@ public class Chan
             Logger.e("UNCAUGHT", "App Version: " + BuildConfig.VERSION_NAME);
             Logger.e("UNCAUGHT", "Phone Model: " + Build.MANUFACTURER + " " + Build.MODEL);
 
-            /*
-            Runtime runtime = Runtime.getRuntime();
-            long usedMemInMB = (runtime.totalMemory() - runtime.freeMemory()) / 1048576L;
-            long maxHeapSizeInMB = runtime.maxMemory() / 1048576L;
-            long availHeapSizeInMB = maxHeapSizeInMB - usedMemInMB;
-            Logger.e("UNCAUGHT", "Used memory (MB): " + usedMemInMB);
-            Logger.e("UNCAUGHT", "Max memory (MB): " + maxHeapSizeInMB);
-            Logger.e("UNCAUGHT", "Available memory (MB): " + availHeapSizeInMB);
-             */
+            if (e instanceof OutOfMemoryError) {
+                Logger.e("UNCAUGHT", "Out of memory! Memory stats:");
+                Runtime runtime = Runtime.getRuntime();
+                long usedMemInMB = (runtime.totalMemory() - runtime.freeMemory()) / 1048576L;
+                long maxHeapSizeInMB = runtime.maxMemory() / 1048576L;
+                long availHeapSizeInMB = maxHeapSizeInMB - usedMemInMB;
+                Logger.e("UNCAUGHT", "Used memory (MB): " + usedMemInMB);
+                Logger.e("UNCAUGHT", "Max memory (MB): " + maxHeapSizeInMB);
+                Logger.e("UNCAUGHT", "Available memory (MB): " + availHeapSizeInMB);
+            }
 
             onUnhandledException(e, errorText);
 
@@ -266,6 +263,7 @@ public class Chan
         BackgroundUtils.cleanup();
         NetUtils.cleanup();
         CancellableToast.cleanup();
+        CancellableSnackbar.cleanup();
     }
 
     public static class ForegroundChangedMessage {

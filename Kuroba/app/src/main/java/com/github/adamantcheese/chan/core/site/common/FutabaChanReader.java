@@ -2,10 +2,14 @@ package com.github.adamantcheese.chan.core.site.common;
 
 import android.util.JsonReader;
 
+import androidx.core.util.Pair;
+
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.PostHttpIcon;
 import com.github.adamantcheese.chan.core.model.PostImage;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.PassthroughBitmapResult;
 import com.github.adamantcheese.chan.core.site.SiteEndpoints;
+import com.github.adamantcheese.chan.core.site.SiteEndpoints.ICON_TYPE;
 import com.github.adamantcheese.chan.core.site.parser.ChanReader;
 import com.github.adamantcheese.chan.core.site.parser.ChanReaderProcessingQueue;
 import com.github.adamantcheese.chan.core.site.parser.CommentParser;
@@ -109,8 +113,11 @@ public class FutabaChanReader
 
         // Country flag
         String countryCode = null;
-        String trollCountryCode = null;
-        String countryName = null;
+        String countryDescription = null;
+
+        // Board flag
+        String boardFlagCode = null;
+        String boardFlagDescription = null;
 
         // 4chan pass leaf
         int since4pass = 0;
@@ -162,11 +169,14 @@ public class FutabaChanReader
                 case "country":
                     countryCode = reader.nextString();
                     break;
-                case "troll_country":
-                    trollCountryCode = reader.nextString();
-                    break;
                 case "country_name":
-                    countryName = reader.nextString();
+                    countryDescription = reader.nextString();
+                    break;
+                case "board_flag":
+                    boardFlagCode = reader.nextString();
+                    break;
+                case "flag_name":
+                    boardFlagDescription = reader.nextString();
                     break;
                 case "spoiler":
                     fileSpoiler = reader.nextInt() == 1;
@@ -261,6 +271,12 @@ public class FutabaChanReader
             queue.setOp(builder.clone());
         }
 
+        if (queue.getOp().sticky) {
+            // for some weird reason, stickies have random \n's in the API return, so just clear those out
+            // this has been reported to the devs
+            builder.comment(builder.comment.toString().replace("\n", ""));
+        }
+
         Post cached = queue.getCachedPost(builder.no);
         if (cached != null) {
             // Post no is known, use the cached post object.
@@ -268,19 +284,38 @@ public class FutabaChanReader
             return;
         }
 
-        if (countryCode != null && countryName != null) {
-            HttpUrl countryUrl = endpoints.icon("country", makeArgument("country_code", countryCode));
-            builder.addHttpIcon(new PostHttpIcon(countryUrl, countryName + "/" + countryCode));
+        if (countryCode != null && countryDescription != null) {
+            Pair<HttpUrl, PassthroughBitmapResult> resultPair =
+                    endpoints.icon(ICON_TYPE.COUNTRY_FLAG, makeArgument("country_code", countryCode));
+            builder.addHttpIcon(new PostHttpIcon(ICON_TYPE.COUNTRY_FLAG,
+                    resultPair.first,
+                    resultPair.second,
+                    countryCode,
+                    countryDescription
+            ));
         }
 
-        if (trollCountryCode != null && countryName != null) {
-            HttpUrl countryUrl = endpoints.icon("troll_country", makeArgument("troll_country_code", trollCountryCode));
-            builder.addHttpIcon(new PostHttpIcon(countryUrl, countryName + "/t_" + trollCountryCode));
+        if (boardFlagCode != null && boardFlagDescription != null) {
+            Pair<HttpUrl, PassthroughBitmapResult> resultPair = endpoints.icon(
+                    ICON_TYPE.BOARD_FLAG,
+                    makeArgument("board_code", builder.board.code, "board_flag_code", boardFlagCode)
+            );
+            builder.addHttpIcon(new PostHttpIcon(ICON_TYPE.BOARD_FLAG,
+                    resultPair.first,
+                    resultPair.second,
+                    boardFlagCode,
+                    boardFlagDescription
+            ));
         }
 
         if (since4pass != 0) {
-            HttpUrl iconUrl = endpoints.icon("since4pass", null);
-            builder.addHttpIcon(new PostHttpIcon(iconUrl, String.valueOf(since4pass)));
+            Pair<HttpUrl, PassthroughBitmapResult> resultPair = endpoints.icon(ICON_TYPE.SINCE4PASS, null);
+            builder.addHttpIcon(new PostHttpIcon(ICON_TYPE.SINCE4PASS,
+                    resultPair.first,
+                    resultPair.second,
+                    "since4pass",
+                    String.valueOf(since4pass)
+            ));
         }
 
         queue.addForParse(builder);

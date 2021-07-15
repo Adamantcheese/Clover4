@@ -16,10 +16,13 @@
  */
 package com.github.adamantcheese.chan.core.site.common.taimaba;
 
+import androidx.core.util.Pair;
+
 import com.github.adamantcheese.chan.BuildConfig;
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses.PassthroughBitmapResult;
 import com.github.adamantcheese.chan.core.site.common.CommonSite;
 
 import java.util.Locale;
@@ -63,6 +66,7 @@ public class TaimabaEndpoints
             case "m4a":
             case "ogg":
             case "flac":
+            case "wav":
                 return HttpUrl.parse(BuildConfig.RESOURCES_ENDPOINT + "audio_thumb.png");
             default:
                 return sys.builder().s(post.board.code).s("thumb").s(arg.get("tim") + "s.jpg").url();
@@ -75,14 +79,14 @@ public class TaimabaEndpoints
     }
 
     @Override
-    public HttpUrl icon(String icon, Map<String, String> arg) {
+    public Pair<HttpUrl, PassthroughBitmapResult> icon(ICON_TYPE icon, Map<String, String> arg) {
         CommonSite.SimpleHttpUrl stat = sys.builder().s("static");
 
-        if (icon.equals("country")) {
+        if (icon == ICON_TYPE.COUNTRY_FLAG) {
             stat.s("flags").s(arg.get("country_code").toLowerCase(Locale.ENGLISH) + ".png");
         }
 
-        return stat.url();
+        return new Pair<>(stat.url(), new PassthroughBitmapResult());
     }
 
     @Override

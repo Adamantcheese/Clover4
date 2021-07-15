@@ -17,6 +17,8 @@
 package com.github.adamantcheese.chan.core.site.http;
 
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
+import com.github.adamantcheese.chan.ui.captcha.CaptchaTokenHolder;
+import com.github.adamantcheese.chan.ui.captcha.CaptchaTokenHolder.CaptchaToken;
 
 import java.io.File;
 
@@ -27,14 +29,9 @@ import static kotlin.random.Random.Default;
  */
 public class Reply {
     /**
-     * Optional. {@code null} when ReCaptcha v2 was used or a 4pass
+     * Used for all authentication stuff that needs to be done.
      */
-    public String captchaChallenge;
-
-    /**
-     * Optional. {@code null} when a 4pass was used.
-     */
-    public String captchaResponse;
+    public CaptchaToken token;
 
     public File file;
     public String fileName;
@@ -47,15 +44,28 @@ public class Reply {
     public String password;
 
     public Reply() {
-        reset(false);
+        try {
+            reset(false);
+        } catch (Throwable e) {
+            // mostly for layout previewer related garbage, but also just in case
+            file = null;
+            fileName = "";
+            name = "";
+            options = "";
+            flag = "";
+            subject = "";
+            comment = "";
+            spoilerImage = false;
+            password = Long.toHexString(Default.nextLong());
+        }
     }
 
-    public void reset(boolean keepName) {
+    public void reset(boolean keepNameAndFlag) {
         file = null;
         fileName = "";
-        name = keepName ? name : ChanSettings.postDefaultName.get();
+        name = keepNameAndFlag ? name : ChanSettings.postDefaultName.get();
         options = "";
-        flag = "";
+        flag = keepNameAndFlag ? flag : "";
         subject = "";
         comment = "";
         spoilerImage = false;

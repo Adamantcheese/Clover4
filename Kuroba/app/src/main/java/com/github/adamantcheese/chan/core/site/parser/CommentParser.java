@@ -37,21 +37,24 @@ import androidx.appcompat.app.AlertDialog;
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.core.manager.ArchivesManager;
 import com.github.adamantcheese.chan.core.model.Post;
+import com.github.adamantcheese.chan.core.model.PostImage;
 import com.github.adamantcheese.chan.core.model.PostLinkable;
 import com.github.adamantcheese.chan.core.model.PostLinkable.Type;
 import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.net.NetUtils;
-import com.github.adamantcheese.chan.core.net.NetUtilsClasses.JSONProcessor;
+import com.github.adamantcheese.chan.core.net.NetUtilsClasses;
 import com.github.adamantcheese.chan.core.net.NetUtilsClasses.ResponseResult;
 import com.github.adamantcheese.chan.core.site.Site;
 import com.github.adamantcheese.chan.core.site.archives.ExternalSiteArchive;
+import com.github.adamantcheese.chan.core.site.archives.ExternalSiteArchive.ArchiveEndpoints;
 import com.github.adamantcheese.chan.core.site.archives.ExternalSiteArchive.ArchiveSiteUrlHandler;
 import com.github.adamantcheese.chan.core.site.sites.chan4.Chan4;
 import com.github.adamantcheese.chan.ui.text.AbsoluteSizeSpanHashed;
 import com.github.adamantcheese.chan.ui.text.CustomTypefaceSpan;
 import com.github.adamantcheese.chan.ui.text.ForegroundColorSpanHashed;
 import com.github.adamantcheese.chan.ui.theme.Theme;
-import com.github.adamantcheese.chan.utils.BackgroundUtils;
+import com.github.adamantcheese.chan.utils.Logger;
+import com.google.common.io.Files;
 
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -65,6 +68,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import okhttp3.HttpUrl;
 
 import static com.github.adamantcheese.chan.core.site.parser.StyleRule.tagRule;
 import static com.github.adamantcheese.chan.ui.widget.DefaultAlertDialog.getDefaultAlertBuilder;
@@ -85,7 +90,8 @@ public class CommentParser {
     private Pattern quotePattern = Pattern.compile(".*#p?(\\d+)");
 
     // A pattern matching any board links
-    private final Pattern boardLinkPattern = Pattern.compile("//boards\\.4chan.*?\\.org/(.*?)/");
+    private final Pattern boardLinkPattern =
+            Pattern.compile("(?:https?:?)?(?://boards\\.4chan.*?\\.org)?/(.*?)/(?:catalog)?");
     //alternate for some sites (formerly 8chan)
     private final Pattern boardLinkPattern8Chan = Pattern.compile("/(.*?)/index.html");
     // A pattern matching any board search links
@@ -107,30 +113,67 @@ public class CommentParser {
         rule(tagRule("a").action(this::handleAnchor));
 
         rule(tagRule("span").cssClass("deadlink")
-                .foregroundColor(StyleRule.ForegroundColor.QUOTE)
+                .foregroundColor(R.attr.post_quote_color, true)
                 .strikeThrough()
                 .action(this::handleDead));
-        rule(tagRule("span").cssClass("spoiler").link(Type.SPOILER));
-        rule(tagRule("span").cssClass("fortune").action(this::handleFortune));
+        rule(tagRule("span").cssClass("spoiler").spoiler());
+        rule(tagRule("span").cssClass("fortune").bold().cssStyleInFront());
         rule(tagRule("span").cssClass("abbr").nullify());
-        rule(tagRule("span").foregroundColor(StyleRule.ForegroundColor.INLINE_QUOTE));
+        rule(tagRule("span").cssClass("quote").foregroundColor(R.attr.post_inline_quote_color, true));
         rule(tagRule("span").cssClass("sjis").action(this::handleSJIS));
+        rule(tagRule("span")); // this allows inline styled elements to be processed
 
         rule(tagRule("table").action(this::handleTable));
 
-        rule(tagRule("s").link(Type.SPOILER));
+        rule(tagRule("s").spoiler());
 
         rule(tagRule("strong").bold());
-        // these ones are css inline style specific
-        rule(tagRule("strong-color: red").bold().foregroundColor(StyleRule.ForegroundColor.RED));
-        rule(tagRule("p-font-size:15px-font-weight:bold").bold());
-
         rule(tagRule("b").bold());
+
+        rule(tagRule("strike").strikeThrough());
 
         rule(tagRule("i").italic());
         rule(tagRule("em").italic());
 
+        rule(tagRule("u").underline());
+
+        rule(tagRule("font").applyFontRules());
+
         rule(tagRule("pre").cssClass("prettyprint").monospace().code().trimEndWhitespace().size(sp(12f)));
+
+        // replaces img tags with an attached image, and any alt-text will become a spoilered text item
+        rule(tagRule("img").action((theme, callback, post, text, element) -> {
+            try {
+                SpannableString ret = new SpannableString(text);
+                if (element.hasAttr("alt")) {
+                    String alt = element.attr("alt");
+                    if (!alt.isEmpty()) {
+                        ret = new SpannableString(alt + " ");
+                        ret.setSpan(new PostLinkable(theme, alt, alt, Type.SPOILER),
+                                0,
+                                alt.length(),
+                                (1000 << Spanned.SPAN_PRIORITY_SHIFT) & Spanned.SPAN_PRIORITY
+                        );
+                    }
+                }
+                HttpUrl src = HttpUrl.get(element.attr("src"));
+                PostImage i = new PostImage.Builder().imageUrl(src)
+                        .thumbnailUrl(src)
+                        .spoilerThumbnailUrl(src)
+                        .filename(Files.getNameWithoutExtension(src.toString()))
+                        .extension(Files.getFileExtension(src.toString()))
+                        .build();
+                if (post.images.size() < 5 && !post.images.contains(i)) {
+                    post.images(Collections.singletonList(i));
+                }
+                return ret;
+            } catch (Exception e) {
+                return text;
+            }
+        }));
+
+        // replaces iframes with the associated src url text
+        rule(tagRule("iframe").action((theme, callback, post, text, element) -> element.attr("src")));
         return this;
     }
 
@@ -172,7 +215,6 @@ public class CommentParser {
             CharSequence text,
             Element element
     ) {
-
         List<StyleRule> rules = this.rules.get(tag);
         if (rules != null) {
             for (int i = 0; i < 2; i++) {
@@ -192,11 +234,18 @@ public class CommentParser {
     private CharSequence handleAnchor(
             @NonNull Theme theme, PostParser.Callback callback, Post.Builder post, CharSequence text, Element anchor
     ) {
-        CommentParser.Link handlerLink = matchAnchor(post, text, anchor, callback);
+        Link handlerLink = null;
+        try {
+            handlerLink = matchAnchor(post, text, anchor, callback);
+        } catch (Exception e) {
+            Logger.w(this, "Failed to parse an element, leaving as plain text.");
+        }
         SpannableStringBuilder spannableStringBuilder = new SpannableStringBuilder();
 
         if (handlerLink != null) {
             addReply(theme, callback, post, handlerLink, spannableStringBuilder);
+        } else {
+            spannableStringBuilder.append(text);
         }
 
         return spannableStringBuilder.length() > 0 ? spannableStringBuilder : null;
@@ -246,25 +295,8 @@ public class CommentParser {
         SpannableString res = new SpannableString(handlerLink.key);
         PostLinkable pl = new PostLinkable(theme, handlerLink.key, handlerLink.value, handlerLink.type);
         res.setSpan(pl, 0, res.length(), (250 << Spanned.SPAN_PRIORITY_SHIFT) & Spanned.SPAN_PRIORITY);
-        post.addLinkable(pl);
 
         spannableStringBuilder.append(res);
-    }
-
-    private CharSequence handleFortune(
-            Theme theme, PostParser.Callback callback, Post.Builder builder, CharSequence text, Element span
-    ) {
-        // html looks like <span class="fortune" style="color:#0893e1"><br><br><b>Your fortune:</b>
-        String style = span.attr("style");
-        if (!TextUtils.isEmpty(style)) {
-            style = style.replace(" ", "").substring(style.indexOf('#') + 1);
-            int hexColor = Integer.parseInt(style, 16);
-            if (hexColor >= 0 && hexColor <= 0xffffff) {
-                text = span(text, new ForegroundColorSpanHashed(0xff000000 + hexColor), new StyleSpan(Typeface.BOLD));
-            }
-        }
-
-        return text;
     }
 
     // This is used on /p/ for exif data.
@@ -367,14 +399,14 @@ public class CommentParser {
                         Type.ARCHIVE
                 );
                 text = span(text, newLinkable);
-                builder.addLinkable(newLinkable);
             }
         } catch (Exception ignored) {
         }
         return text;
     }
 
-    public Link matchAnchor(Post.Builder post, CharSequence text, Element anchor, PostParser.Callback callback) {
+    public Link matchAnchor(Post.Builder post, CharSequence text, Element anchor, PostParser.Callback callback)
+            throws Exception {
         String href = anchor.attr("href");
         //gets us something like /board/ or /thread/postno#quoteno
         //hacky fix for 4chan having two domains but the same API
@@ -433,8 +465,13 @@ public class CommentParser {
                     t = Type.SEARCH;
                     value = new SearchLink(board, search);
                 } else {
-                    //normal link
-                    t = Type.LINK;
+                    if (href.startsWith("javascript:")) {
+                        //this link would run javascript on the source webpage, open this in a webview
+                        t = Type.JAVASCRIPT;
+                    } else {
+                        //normal link
+                        t = Type.LINK;
+                    }
                     value = href;
                 }
             }
@@ -468,19 +505,26 @@ public class CommentParser {
         public Object value;
     }
 
+    /**
+     * A board, thread, and postId combination to identify a thread.
+     * Used for ExternalSiteArchives.
+     */
     public static class ThreadLink {
-        public String board;
+        public String boardCode;
         public int threadId;
         public int postId;
 
-        public ThreadLink(String board, int threadId, int postId) {
-            this.board = board;
+        public ThreadLink(String boardCode, int threadId, int postId) {
+            this.boardCode = boardCode;
             this.threadId = threadId;
             this.postId = postId;
         }
     }
 
-    // this should only ever be for Archives
+    /**
+     * Resolve a board and postId to a ThreadLink.
+     * Used for ExternalSiteArchives.
+     */
     public static class ResolveLink {
         public Board board;
         public int postId;
@@ -491,19 +535,22 @@ public class CommentParser {
         }
 
         public void resolve(@NonNull ResolveCallback callback, @NonNull ResolveParser parser) {
-            NetUtils.makeJsonRequest(((ExternalSiteArchive.ArchiveEndpoints) board.site.endpoints()).resolvePost(board.code,
-                    postId
-            ), new ResponseResult<ThreadLink>() {
-                @Override
-                public void onFailure(Exception e) {
-                    BackgroundUtils.runOnMainThread(() -> callback.onProcessed(null));
-                }
+            NetUtils.makeJsonRequest(((ArchiveEndpoints) board.site.endpoints()).resolvePost(board.code, postId),
+                    new NetUtilsClasses.MainThreadResponseResult<>(new ResponseResult<ThreadLink>() {
+                        @Override
+                        public void onFailure(Exception e) {
+                            callback.onProcessed(null);
+                        }
 
-                @Override
-                public void onSuccess(ThreadLink result) {
-                    BackgroundUtils.runOnMainThread(() -> callback.onProcessed(result));
-                }
-            }, parser, 5000);
+                        @Override
+                        public void onSuccess(ThreadLink result) {
+                            callback.onProcessed(result);
+                        }
+                    }),
+                    parser,
+                    NetUtilsClasses.NO_CACHE,
+                    5000
+            );
         }
 
         public interface ResolveCallback {
@@ -511,7 +558,7 @@ public class CommentParser {
         }
 
         public static class ResolveParser
-                extends JSONProcessor<ThreadLink> {
+                implements NetUtilsClasses.Converter<ThreadLink, JsonReader> {
             private final ResolveLink sourceLink;
 
             public ResolveParser(ResolveLink source) {
@@ -519,7 +566,7 @@ public class CommentParser {
             }
 
             @Override
-            public ThreadLink process(JsonReader reader) {
+            public ThreadLink convert(JsonReader reader) {
                 return ((ArchiveSiteUrlHandler) sourceLink.board.site.resolvable()).resolveToThreadLink(sourceLink,
                         reader
                 );

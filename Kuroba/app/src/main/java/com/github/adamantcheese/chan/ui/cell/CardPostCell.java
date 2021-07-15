@@ -22,7 +22,6 @@ import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
-import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.cardview.widget.CardView;
@@ -30,12 +29,13 @@ import androidx.cardview.widget.CardView;
 import com.github.adamantcheese.chan.R;
 import com.github.adamantcheese.chan.core.model.Post;
 import com.github.adamantcheese.chan.core.model.PostImage;
+import com.github.adamantcheese.chan.core.model.orm.Board;
 import com.github.adamantcheese.chan.core.model.orm.Loadable;
+import com.github.adamantcheese.chan.core.repository.BitmapRepository;
 import com.github.adamantcheese.chan.core.repository.PageRepository;
 import com.github.adamantcheese.chan.core.settings.ChanSettings;
 import com.github.adamantcheese.chan.core.site.common.CommonDataStructs.ChanPage;
-import com.github.adamantcheese.chan.features.embedding.EmbeddingEngine;
-import com.github.adamantcheese.chan.features.embedding.EmbeddingEngine.InvalidateFunction;
+import com.github.adamantcheese.chan.ui.cell.PostCellInterface.PostCellCallback.PostOptions;
 import com.github.adamantcheese.chan.ui.layout.FixedRatioLinearLayout;
 import com.github.adamantcheese.chan.ui.theme.Theme;
 import com.github.adamantcheese.chan.ui.view.FloatingMenu;
@@ -45,28 +45,25 @@ import com.github.adamantcheese.chan.ui.view.ThumbnailView;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
-
-import okhttp3.Call;
 
 import static com.github.adamantcheese.chan.ui.adapter.PostsFilter.Order.isNotBumpOrder;
+import static com.github.adamantcheese.chan.ui.widget.CancellableToast.showToast;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.dp;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getAttrColor;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getString;
-import static com.github.adamantcheese.chan.utils.AndroidUtils.waitForMeasure;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.setClipboardContent;
+import static com.github.adamantcheese.chan.utils.AndroidUtils.sp;
 import static com.github.adamantcheese.chan.utils.StringUtils.applySearchSpans;
 
 public class CardPostCell
         extends CardView
-        implements PostCellInterface, InvalidateFunction {
+        implements PostCellInterface {
     private static final int COMMENT_MAX_LINES = 10;
 
-    private boolean bound;
     private Post post;
     private PostCellInterface.PostCellCallback callback;
-    private boolean highlighted = false;
-    private boolean compact = false;
-    private String searchQuery;
+
+    private int iconSizePx;
 
     private PostImageThumbnailView thumbView;
     private TextView title;
@@ -74,8 +71,7 @@ public class CardPostCell
     private TextView replies;
     private ImageView options;
     private View filterMatchColor;
-
-    private final List<Call> embedCalls = new CopyOnWriteArrayList<>();
+    private PostIcons icons;
 
     public CardPostCell(Context context) {
         super(context);
@@ -94,48 +90,58 @@ public class CardPostCell
         super.onFinishInflate();
 
         thumbView = findViewById(R.id.thumbnail);
-        thumbView.setOnClickListener((view) -> callback.onThumbnailClicked(post.image(), (ThumbnailView) view));
         title = findViewById(R.id.title);
         comment = findViewById(R.id.comment);
         replies = findViewById(R.id.replies);
         options = findViewById(R.id.options);
         filterMatchColor = findViewById(R.id.filter_match_color);
+        icons = findViewById(R.id.icons);
+
+        setCompact(false);
+
+        if (isInEditMode()) {
+            BitmapRepository.initialize(getContext());
+            icons.setWithoutText(new Post.Builder().sticky(true)
+                    .closed(true)
+                    .archived(true)
+                    .board(Board.getDummyBoard())
+                    .no(1)
+                    .opId(1)
+                    .setUnixTimestampSeconds(System.currentTimeMillis())
+                    .comment("")
+                    .build(), iconSizePx);
+        }
 
         setOnClickListener((view) -> callback.onPostClicked(post));
 
-        if (!isInEditMode()) {
-            setCompact(compact);
-        }
-
         options.setOnClickListener(v -> {
-            List<FloatingMenuItem<Integer>> items = new ArrayList<>();
-            List<FloatingMenuItem<Integer>> extraItems = new ArrayList<>();
+            List<FloatingMenuItem<PostOptions>> items = new ArrayList<>();
+            List<FloatingMenuItem<PostOptions>> extraItems = new ArrayList<>();
             Object extraOption = callback.onPopulatePostOptions(post, items, extraItems);
             showOptions(v, items, extraItems, extraOption);
         });
 
         if (!isInEditMode() && ChanSettings.getBoardColumnCount() == 1) {
-            ((LinearLayout.LayoutParams) comment.getLayoutParams()).height = ViewGroup.LayoutParams.WRAP_CONTENT;
-            ((LinearLayout.LayoutParams) comment.getLayoutParams()).weight = 0;
             ((FixedRatioLinearLayout) findViewById(R.id.card_content)).setRatio(0.0f);
             thumbView.setOnLongClickListener(v -> {
                 callback.onPostClicked(post);
                 return true;
             });
-            invalidate();
         }
     }
 
     private void showOptions(
             View anchor,
-            List<FloatingMenuItem<Integer>> items,
-            List<FloatingMenuItem<Integer>> extraItems,
+            List<FloatingMenuItem<PostOptions>> items,
+            List<FloatingMenuItem<PostOptions>> extraItems,
             Object extraOption
     ) {
-        FloatingMenu<Integer> menu = new FloatingMenu<>(getContext(), anchor, items);
-        menu.setCallback(new FloatingMenu.ClickCallback<Integer>() {
+        FloatingMenu<PostOptions> menu = new FloatingMenu<>(getContext(), anchor, items);
+        menu.setCallback(new FloatingMenu.ClickCallback<PostOptions>() {
             @Override
-            public void onFloatingMenuItemClicked(FloatingMenu<Integer> menu, FloatingMenuItem<Integer> item) {
+            public void onFloatingMenuItemClicked(
+                    FloatingMenu<PostOptions> menu, FloatingMenuItem<PostOptions> item
+            ) {
                 if (item.getId() == extraOption) {
                     showOptions(anchor, extraItems, null, null);
                 }
@@ -149,34 +155,15 @@ public class CardPostCell
     public void setPost(
             Loadable loadable,
             final Post post,
-            PostCellInterface.PostCellCallback callback,
+            PostCellCallback callback,
             boolean inPopup,
             boolean highlighted,
-            int markedNo,
-            ChanSettings.PostViewMode postViewMode,
             boolean compact,
-            String searchQuery,
             Theme theme
     ) {
-        if (this.post != null && bound) {
-            bound = false;
-            thumbView.setPostImage(null);
-            for (Call c : embedCalls) {
-                c.cancel();
-            }
-            embedCalls.clear();
-            findViewById(R.id.embed_spinner).setVisibility(GONE);
-            this.post = null;
-        }
-
-        this.post = post;
-        this.highlighted = highlighted;
         this.callback = callback;
-        this.searchQuery = searchQuery;
 
-        bindPost(theme, post);
-
-        this.compact = compact;
+        bindPost(theme, post, highlighted);
         setCompact(compact);
     }
 
@@ -193,8 +180,8 @@ public class CardPostCell
         return false;
     }
 
-    private void bindPost(Theme theme, Post post) {
-        bound = true;
+    private void bindPost(Theme theme, Post post, boolean highlighted) {
+        this.post = post;
 
         if (highlighted || post.isSavedReply) {
             setBackgroundColor(getAttrColor(getContext(), R.attr.highlight_color));
@@ -204,15 +191,22 @@ public class CardPostCell
 
         if (post.image() != null && !ChanSettings.textOnly.get()) {
             thumbView.setVisibility(VISIBLE);
-            waitForMeasure(thumbView, view -> {
-                // decode to a square the size of the width, even though the height is smaller it appears better
-                thumbView.setDecodeSize(thumbView.getWidth());
-                thumbView.setPostImage(post.image());
-                return true;
-            });
+            thumbView.setPostImage(post.image(), -1);
         } else {
             thumbView.setVisibility(GONE);
-            thumbView.setPostImage(null);
+            thumbView.setPostImage(null, 0);
+        }
+
+        thumbView.setOnClickListener((view) -> callback.onThumbnailClicked(post.image(), thumbView));
+        if (ChanSettings.enableLongPressURLCopy.get()) {
+            thumbView.setOnLongClickListener(v -> {
+                if (post.image() != null) {
+                    setClipboardContent("Image URL", post.image().imageUrl.toString());
+                    showToast(getContext(), R.string.image_url_copied_to_clipboard);
+                    return true;
+                }
+                return false;
+            });
         }
 
         if (post.filterHighlightedColor != 0) {
@@ -222,12 +216,15 @@ public class CardPostCell
             filterMatchColor.setVisibility(GONE);
         }
 
+        icons.setWithoutText(post, iconSizePx);
+
         title.setVisibility(TextUtils.isEmpty(post.subjectSpan) ? GONE : VISIBLE);
-        title.setText(TextUtils.isEmpty(post.subjectSpan) ? null : applySearchSpans(post.subjectSpan, searchQuery));
+        title.setText(TextUtils.isEmpty(post.subjectSpan)
+                ? null
+                : applySearchSpans(theme, post.subjectSpan, callback.getSearchQuery()));
 
         comment.setMaxLines(ChanSettings.getBoardColumnCount() != 1 ? COMMENT_MAX_LINES : Integer.MAX_VALUE);
-        comment.setEllipsize(ChanSettings.getBoardColumnCount() != 1 ? TextUtils.TruncateAt.END : null);
-        comment.setText(applySearchSpans(post.comment, searchQuery));
+        comment.setText(applySearchSpans(theme, post.comment, callback.getSearchQuery()));
 
         String status = getString(R.string.card_stats, post.getReplies(), post.getImagesCount());
         if (!ChanSettings.neverShowPages.get()) {
@@ -238,33 +235,38 @@ public class CardPostCell
         }
 
         replies.setText(status);
-
-        findViewById(R.id.embed_spinner).setVisibility(GONE);
-        embedCalls.addAll(EmbeddingEngine.getInstance().embed(theme, post, this));
-        if (!embedCalls.isEmpty()) {
-            findViewById(R.id.embed_spinner).setVisibility(VISIBLE);
-        }
     }
 
     @Override
-    public void invalidateView(Theme theme, Post post) {
-        if (!bound || !this.post.equals(post)) return;
-        embedCalls.clear();
-        bindPost(theme, post);
+    public void unsetPost() {
+        icons.clear();
+        thumbView.setPostImage(null, 0);
+        thumbView.setOnClickListener(null);
+        thumbView.setOnLongClickListener(null);
+        post = null;
     }
 
     private void setCompact(boolean compact) {
-        int textSizeSp = ChanSettings.fontSize.get() + (compact ? -2 : 0);
-        title.setTextSize(textSizeSp);
-        comment.setTextSize(textSizeSp);
-        replies.setTextSize(textSizeSp);
+        int textSizeSp = isInEditMode() ? 15 : ChanSettings.fontSize.get();
+        int compactSize = textSizeSp + (compact ? -2 : 0);
+        iconSizePx = sp(getContext(), compactSize);
+        title.setTextSize(compactSize);
+        icons.setHeight(iconSizePx);
+        comment.setTextSize(compactSize);
+        replies.setTextSize(compactSize);
 
-        int p = compact ? dp(3) : dp(8);
+        icons.setSpacing(dp(getContext(), 4));
+
+        int p = compact ? dp(getContext(), 3) : dp(getContext(), 8);
 
         // Same as the layout.
         title.setPadding(p, p, p, 0);
         comment.setPadding(p, p, p, 0);
-        replies.setPadding(p, p / 2, p, p);
+        replies.setPadding(p, p, p / 2, p);
         options.setPadding(p, p / 2, p / 2, p / 2);
+
+        ViewGroup.LayoutParams params = options.getLayoutParams();
+        params.height = dp(getContext(), 32) - (compact ? 2 * p : 0);
+        options.setLayoutParams(params);
     }
 }

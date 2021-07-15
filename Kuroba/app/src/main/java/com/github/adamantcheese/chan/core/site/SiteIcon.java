@@ -33,8 +33,6 @@ import okhttp3.HttpUrl;
 import static com.github.adamantcheese.chan.utils.AndroidUtils.getRes;
 
 public class SiteIcon {
-    private static final int FAVICON_SIZE = 64;
-
     private HttpUrl url;
     private Drawable drawable;
 
@@ -68,13 +66,13 @@ public class SiteIcon {
                 }
 
                 @Override
-                public void onBitmapSuccess(@NonNull HttpUrl source, @NonNull Bitmap bitmap) {
+                public void onBitmapSuccess(@NonNull HttpUrl source, @NonNull Bitmap bitmap, boolean fromCache) {
                     drawable = new BitmapDrawable(getRes(), bitmap);
                     drawable.setFilterBitmap(false);
                     drawable.setDither(false);
                     BackgroundUtils.runOnMainThread(() -> res.onSiteIcon(drawable));
                 }
-            }, FAVICON_SIZE, FAVICON_SIZE);
+            });
         }
     }
 
