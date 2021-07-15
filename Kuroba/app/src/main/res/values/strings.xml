@@ -103,7 +103,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <string name="update_install_download_failed">Could not download the new version.</string>
     <string name="update_install_download_failed_description">Because %1$s.</string>
     <string name="update_retry_title">Retry</string>
-    <string name="update_retry">%1$s not updated yet. Tap \"Retry\" to try installing the new version again.</string>
+    <string name="update_retry">%1$s not upgraded yet. Tap \"Retry\" to try installing the new version again.</string>
     <string name="update_retry_button">Retry</string>
     <string name="update_storage_permission_required_title">Storage permission required</string>
     <string name="update_storage_permission_required">
@@ -656,7 +656,7 @@ Don't have a 4chan Pass?<br>
     <string name="media_settings_could_not_copy_files">Could not copy one folders\'s file into another one</string>
     <string name="media_settings_files_copied">All files were copied</string>
     <string name="media_settings_would_you_like_to_delete_file_in_old_dir">Delete the files in the old folder?</string>
-    <string name="media_settings_file_have_been_copied">The copied files now exist in two places. You can remove them from \n\"%1$s.\"\n\n \nThis DELETES ALL files in that directory, even ones unrelated to the app.</string>
+    <string name="media_settings_file_have_been_copied">The copied files now exist in two places. You can remove them from \n\"%1$s.\"\n\n \nThis DELETES ALL files in that folder, even ones unrelated to the app.</string>
     <string name="media_settings_could_not_delete_files_in_old_dir">Could not delete files in the old folder</string>
     <string name="media_settings_old_files_deleted">Deleted all files in the old folder</string>
     <string name="media_settings_copy_files">Copy files</string>
@@ -671,7 +671,7 @@ Don't have a 4chan Pass?<br>
 
     <string name="add_dubs_title">Add dubs to post cells</string>
     <string name="add_dubs_description">Appends your GET to your post number, for FUN!</string>
-    <string name="files_base_dir_does_not_exist"><![CDATA[Base directory for files does not exist! Set it manually in the settings (Media -> Save location)]]></string>
+    <string name="files_base_dir_does_not_exist"><![CDATA[There is no base folder for files. Set it manually in the settings (Media → Save location)]]></string>
     <string name="image_saver_could_not_figure_out_save_location">Could not figure out where to save the files</string>
     <string name="settings_captcha_setup">CAPTCHA Settings</string>
     <string name="settings_captcha_setup_description">Tap to set up CAPTCHA settings for each site.</string>
@@ -720,8 +720,8 @@ Don't have a 4chan Pass?<br>
     <string name="deleted_n_crashlogs">Deleted %1$d crash log(s)</string>
     <string name="sent_n_crashlogs">Sent %1$d crash log(s)</string>
 
-    <string name="media_settings_base_dir_reset">Base directory reset to default</string>
-    <string name="media_settings_could_not_create_default_baseDir">Could not create default base directory because %1$s</string>
+    <string name="media_settings_base_dir_reset">Base folder reset to default</string>
+    <string name="media_settings_could_not_create_default_baseDir">Could not create a default base folder because %1$s</string>
 
     <string name="site_uses_dynamic_boards">"Since the site likely has dynamic boards you must add one from the \"Boards\" menu first."</string>
     <string name="could_not_start_saving_no_permissions">Grant write access permission to start downloading images</string>
@@ -729,11 +729,11 @@ Don't have a 4chan Pass?<br>
     <string name="update_manager_copy_apk">Would you like to store this APK?</string>
     <string name="update_manager_could_not_convert_uri">Could not convert URI (%1$s) into an ExternalFile</string>
     <string name="update_manager_input_file_does_not_exist">Input APK file (%1$s) does not exist</string>
-    <string name="update_manager_output_file_does_not_exist">Output file (%1$s) does not exist</string>
-    <string name="update_manager_could_not_copy_apk">Could not copy file contents from file (%1$s) into (%2$s)</string>
+    <string name="update_manager_output_file_does_not_exist">The output file (%1$s) does not exist</string>
+    <string name="update_manager_could_not_copy_apk">Could not copy file content from the file (%1$s) into (%2$s)</string>
     <string name="update_manager_apk_copied">APK copied</string>
-    <string name="settings_show_copy_apk_dialog_title">Show \"copy APK\" dialog when downloading an update</string>
-    <string name="settings_show_copy_apk_dialog">Every time you download a new update a dialog with suggestion to copy that APK to some other directory will be shown</string>
+    <string name="settings_show_copy_apk_dialog_title">Show \"copy APK\" dialog when downloading a new version</string>
+    <string name="settings_show_copy_apk_dialog">Every time you download a new version, a suggestion to copy that APK to some other folder will be shown.</string>
 
     <string name="could_not_initialized_captcha">Could not present CAPTCHA because %1$s</string>
     <string name="fail_reason_webview_is_not_installed">WebView is not installed</string>
